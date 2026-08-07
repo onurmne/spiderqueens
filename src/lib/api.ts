@@ -357,6 +357,11 @@ export async function loginUserApi(params: {
 }
 
 // Cast Vote
+function isValidUuid(value?: string | null): boolean {
+  if (!value) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 export async function castVoteApi(contestantId: string, isSuperVote: boolean, fingerprintHash: string) {
   // Resolve current user (session) early for test-email bypass + user_id on vote row
   let currentUserId: string | null = null;
@@ -393,7 +398,99 @@ export async function castVoteApi(contestantId: string, isSuperVote: boolean, fi
   }
 
   const unlimited = isUnlimitedTestEmail(currentEmail);
+  const voteVal = isSuperVote ? 5 : 1;
 
+  // Prefer Supabase on live (Vercel has no /api/vote → 404/405 noise)
+  if (isSupabaseConfigured && supabase) {
+    try {
+      if (isSuperVote && !unlimited && currentSuperCredit < 1) {
+        throw new Error('insufficient_super_votes');
+      }
+
+      // Only attach user_id when it is a real UUID (local fallback ids like "user_123" cause 400)
+      const insertPayload: Record<string, unknown> = {
+        contestant_id: contestantId,
+        is_super_vote: isSuperVote,
+        voter_ip: unlimited ? 'test_unlimited' : 'client_app',
+        fingerprint_hash: fingerprintHash || 'sqfp_default',
+      };
+      if (isValidUuid(currentUserId)) {
+        insertPayload.user_id = currentUserId;
+      }
+
+      // 1) Audit row (non-fatal if fails — e.g. invalid contestant uuid in demo data)
+      const { error: insertErr } = await supabase.from('votes').insert([insertPayload]);
+      if (insertErr) {
+        console.warn('votes insert:', insertErr.message || insertErr);
+      }
+
+      // 2) Increment votes_count — try RPC first, always fall back to direct UPDATE
+      let countUpdated = false;
+      const { error: rpcErr } = await supabase.rpc('increment_vote_count', {
+        contestant_id: contestantId,
+        is_super: isSuperVote,
+      });
+
+      if (rpcErr) {
+        console.warn('increment_vote_count RPC:', rpcErr.message || rpcErr);
+        const { data: currentContestant, error: selErr } = await supabase
+          .from('contestants')
+          .select('votes_count')
+          .eq('id', contestantId)
+          .maybeSingle();
+
+        if (!selErr && currentContestant) {
+          const { error: updErr } = await supabase
+            .from('contestants')
+            .update({ votes_count: (currentContestant.votes_count || 0) + voteVal })
+            .eq('id', contestantId);
+          if (updErr) {
+            console.warn('votes_count direct update:', updErr.message || updErr);
+          } else {
+            countUpdated = true;
+          }
+        }
+      } else {
+        countUpdated = true;
+      }
+
+      let newSuperRemaining = currentSuperCredit;
+      if (isSuperVote && isValidUuid(currentUserId)) {
+        newSuperRemaining = Math.max(0, currentSuperCredit - 1);
+        const { error: credErr } = await supabase
+          .from('profiles')
+          .update({ super_votes_credit: newSuperRemaining })
+          .eq('id', currentUserId);
+        if (credErr) {
+          console.warn('super_votes credit update:', credErr.message || credErr);
+        }
+        try {
+          const raw = localStorage.getItem('sq_user_session');
+          if (raw) {
+            const sess = JSON.parse(raw);
+            sess.super_votes_credit = newSuperRemaining;
+            localStorage.setItem('sq_user_session', JSON.stringify(sess));
+          }
+        } catch (e) {}
+      } else if (isSuperVote && unlimited) {
+        newSuperRemaining = Math.max(currentSuperCredit, 999);
+      }
+
+      return {
+        success: true,
+        is_super_vote: isSuperVote,
+        votes_added: voteVal,
+        count_updated: countUpdated,
+        free_votes_remaining: unlimited ? 9999 : 4,
+        super_votes_remaining: isSuperVote ? newSuperRemaining : currentSuperCredit,
+      };
+    } catch (e: any) {
+      console.warn('Supabase vote recording error:', e);
+      if (e?.message === 'insufficient_super_votes') throw e;
+    }
+  }
+
+  // Local Express path (dev only)
   const result = await safeJsonFetch('/api/vote', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -408,82 +505,6 @@ export async function castVoteApi(contestantId: string, isSuperVote: boolean, fi
 
   if (result.ok && result.data) {
     return result.data;
-  }
-
-  // Direct Supabase path (Vercel live: Express /api is not available)
-  if (isSupabaseConfigured && supabase) {
-    try {
-      const voteVal = isSuperVote ? 5 : 1;
-
-      if (isSuperVote) {
-        if (!unlimited && currentSuperCredit < 1) {
-          throw new Error('insufficient_super_votes');
-        }
-      }
-
-      // Insert vote row (trigger should increment votes_count if SECURITY DEFINER)
-      const insertPayload: any = {
-        contestant_id: contestantId,
-        is_super_vote: isSuperVote,
-        voter_ip: unlimited ? 'test_unlimited' : 'client_app',
-        fingerprint_hash: fingerprintHash || 'sqfp_default',
-      };
-      if (currentUserId) insertPayload.user_id = currentUserId;
-
-      const { error: insertErr } = await supabase.from('votes').insert([insertPayload]);
-
-      // Always ensure votes_count is incremented via SECURITY DEFINER RPC
-      // (covers cases where trigger is missing / not yet migrated / RLS blocked)
-      const { error: rpcErr } = await supabase.rpc('increment_vote_count', {
-        contestant_id: contestantId,
-        is_super: isSuperVote,
-      });
-
-      if (rpcErr && insertErr) {
-        // Last-resort direct update (requires permissive UPDATE policy)
-        const { data: currentContestant } = await supabase
-          .from('contestants')
-          .select('votes_count')
-          .eq('id', contestantId)
-          .single();
-
-        if (currentContestant) {
-          await supabase
-            .from('contestants')
-            .update({ votes_count: (currentContestant.votes_count || 0) + voteVal })
-            .eq('id', contestantId);
-        }
-      }
-
-      let newSuperRemaining = currentSuperCredit;
-      if (isSuperVote && currentUserId) {
-        newSuperRemaining = Math.max(0, currentSuperCredit - 1);
-        await supabase
-          .from('profiles')
-          .update({ super_votes_credit: newSuperRemaining })
-          .eq('id', currentUserId);
-
-        try {
-          const raw = localStorage.getItem('sq_user_session');
-          if (raw) {
-            const sess = JSON.parse(raw);
-            sess.super_votes_credit = newSuperRemaining;
-            localStorage.setItem('sq_user_session', JSON.stringify(sess));
-          }
-        } catch (e) {}
-      }
-
-      return {
-        success: true,
-        is_super_vote: isSuperVote,
-        votes_added: voteVal,
-        free_votes_remaining: unlimited ? 9999 : 4,
-        super_votes_remaining: isSuperVote ? newSuperRemaining : currentSuperCredit,
-      };
-    } catch (e: any) {
-      console.warn('Supabase vote recording error:', e);
-      if (e?.message === 'insufficient_super_votes') throw e;
-    }
   }
 
   return {
