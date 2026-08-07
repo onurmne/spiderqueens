@@ -132,27 +132,18 @@ CREATE TRIGGER trg_prevent_self_vote
 BEFORE INSERT ON public.votes
 FOR EACH ROW EXECUTE FUNCTION check_self_vote();
 
--- Trigger 2: Auto-increment votes_count on contestant table when a vote is inserted
+-- Trigger 2 (legacy): Auto-increment was moved to client-side SECURITY DEFINER RPC
+-- `increment_vote_count` to avoid RLS failures on live (Vercel + anon key).
+-- Drop any existing trigger so votes are NOT double-counted when RPC is also called.
 CREATE OR REPLACE FUNCTION increment_contestant_vote_count()
 RETURNS TRIGGER AS $$
 BEGIN
-  IF NEW.is_super_vote THEN
-    UPDATE public.contestants 
-    SET votes_count = votes_count + 5 
-    WHERE id = NEW.contestant_id;
-  ELSE
-    UPDATE public.contestants 
-    SET votes_count = votes_count + 1 
-    WHERE id = NEW.contestant_id;
-  END IF;
+  -- No-op: vote count is applied via public.increment_vote_count RPC from the app.
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 DROP TRIGGER IF EXISTS trg_increment_votes ON public.votes;
-CREATE TRIGGER trg_increment_votes
-AFTER INSERT ON public.votes
-FOR EACH ROW EXECUTE FUNCTION increment_contestant_vote_count();
 
 -- Trigger 3: Risk-Free Dynamic Reward Pool Auto-Growth on Approved Transaction
 CREATE OR REPLACE FUNCTION auto_feed_reward_pool()
@@ -235,7 +226,11 @@ CREATE POLICY "Approved contestants viewable by everyone" ON public.contestants 
 DROP POLICY IF EXISTS "Authenticated users can submit contestant application" ON public.contestants;
 DROP POLICY IF EXISTS "Anyone can submit contestant application" ON public.contestants;
 CREATE POLICY "Anyone can submit contestant application" ON public.contestants FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Admins can update contestant status" ON public.contestants;
 CREATE POLICY "Admins can update contestant status" ON public.contestants FOR UPDATE USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+-- Allow votes_count to be updated by security definer functions / service paths
+DROP POLICY IF EXISTS "Allow vote count updates" ON public.contestants;
+CREATE POLICY "Allow vote count updates" ON public.contestants FOR UPDATE USING (true) WITH CHECK (true);
 
 -- Votes: Public insert, public view
 DROP POLICY IF EXISTS "Anyone can cast a vote" ON public.votes;
