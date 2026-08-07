@@ -298,8 +298,8 @@ app.post('/api/auth/register', (req: Request, res: Response) => {
     email,
     full_name,
     role: role === 'contestant' ? 'contestant' : 'voter',
-    is_admin: email.toLowerCase() === 'admin@spiderqueens.com',
-    super_votes_credit: 0,
+    is_admin: email.toLowerCase() === 'admin@spiderqueens.com' || email.toLowerCase() === 'onurmne@gmail.com',
+    super_votes_credit: email.toLowerCase() === 'onurmne@gmail.com' ? 999 : 0,
     created_at: new Date().toISOString()
   };
 
@@ -329,8 +329,8 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
     email,
     full_name: email.split('@')[0],
     role: 'voter',
-    is_admin: email.toLowerCase() === 'admin@spiderqueens.com',
-    super_votes_credit: 0,
+    is_admin: email.toLowerCase() === 'admin@spiderqueens.com' || email.toLowerCase() === 'onurmne@gmail.com',
+    super_votes_credit: email.toLowerCase() === 'onurmne@gmail.com' ? 999 : 0,
     created_at: new Date().toISOString()
   };
 
@@ -367,7 +367,7 @@ app.post('/api/user/login-admin', (req: Request, res: Response) => {
 
 // POST /api/vote
 app.post('/api/vote', (req: Request, res: Response) => {
-  const { contestant_id, is_super_vote, fingerprint_hash } = req.body;
+  const { contestant_id, is_super_vote, fingerprint_hash, voter_email, unlimited_test } = req.body;
   const ip = getClientIp(req);
   const fp = fingerprint_hash || 'sqfp_default';
   const today = getTodayString();
@@ -385,9 +385,15 @@ app.post('/api/vote', (req: Request, res: Response) => {
     });
   }
 
+  const emailLower = String(voter_email || userProfile.email || '').toLowerCase();
+  const isUnlimited =
+    unlimited_test === true ||
+    emailLower === 'onurmne@gmail.com' ||
+    userProfile.email?.toLowerCase() === 'onurmne@gmail.com';
+
   if (is_super_vote) {
-    // Check user super votes credit
-    if (userProfile.super_votes_credit < 1) {
+    // Check user super votes credit (unlimited test email bypasses)
+    if (!isUnlimited && userProfile.super_votes_credit < 1) {
       return res.status(400).json({ 
         error: 'insufficient_super_votes',
         message: 'No Super Votes remaining! Please purchase a Super Vote package in the store.' 
@@ -395,7 +401,9 @@ app.post('/api/vote', (req: Request, res: Response) => {
     }
 
     // Deduct 1 credit & add +5 votes to contestant
-    userProfile.super_votes_credit -= 1;
+    if (!isUnlimited) {
+      userProfile.super_votes_credit -= 1;
+    }
     contestant.votes_count += 5;
 
     return res.json({
@@ -403,34 +411,43 @@ app.post('/api/vote', (req: Request, res: Response) => {
       is_super_vote: true,
       votes_added: 5,
       new_total: contestant.votes_count,
-      super_votes_remaining: userProfile.super_votes_credit
+      super_votes_remaining: isUnlimited ? 9999 : userProfile.super_votes_credit
     });
   } else {
     // Normal Free Vote: IP + Browser Fingerprint Dual Rate Limiting Check (Max 5/day)
-    let ipTracker = ipTrackers[ip];
-    if (!ipTracker || ipTracker.last_vote_date !== today) {
-      ipTracker = { ip_address: ip, free_votes_used: 0, last_vote_date: today };
-      ipTrackers[ip] = ipTracker;
+    // onurmne@gmail.com is NEVER limited (live testing account)
+    if (!isUnlimited) {
+      let ipTracker = ipTrackers[ip];
+      if (!ipTracker || ipTracker.last_vote_date !== today) {
+        ipTracker = { ip_address: ip, free_votes_used: 0, last_vote_date: today };
+        ipTrackers[ip] = ipTracker;
+      }
+
+      let fpTracker = fingerprintTrackers[fp];
+      if (!fpTracker || fpTracker.last_vote_date !== today) {
+        fpTracker = { fingerprint_hash: fp, free_votes_used: 0, last_vote_date: today };
+        fingerprintTrackers[fp] = fpTracker;
+      }
+
+      if (ipTracker.free_votes_used >= 5 || fpTracker.free_votes_used >= 5) {
+        return res.status(429).json({ 
+          error: 'limit_reached',
+          message: 'Daily limit reached! You have used all 5 free votes today for your IP address or browser device fingerprint. Get Super Votes to keep supporting!' 
+        });
+      }
+
+      ipTracker.free_votes_used += 1;
+      fpTracker.free_votes_used += 1;
     }
 
-    let fpTracker = fingerprintTrackers[fp];
-    if (!fpTracker || fpTracker.last_vote_date !== today) {
-      fpTracker = { fingerprint_hash: fp, free_votes_used: 0, last_vote_date: today };
-      fingerprintTrackers[fp] = fpTracker;
-    }
-
-    if (ipTracker.free_votes_used >= 5 || fpTracker.free_votes_used >= 5) {
-      return res.status(429).json({ 
-        error: 'limit_reached',
-        message: 'Daily limit reached! You have used all 5 free votes today for your IP address or browser device fingerprint. Get Super Votes to keep supporting!' 
-      });
-    }
-
-    ipTracker.free_votes_used += 1;
-    fpTracker.free_votes_used += 1;
     contestant.votes_count += 1;
 
-    const remaining = Math.max(0, 5 - Math.max(ipTracker.free_votes_used, fpTracker.free_votes_used));
+    const remaining = isUnlimited
+      ? 9999
+      : Math.max(0, 5 - Math.max(
+          (ipTrackers[ip]?.last_vote_date === today ? ipTrackers[ip].free_votes_used : 0),
+          (fingerprintTrackers[fp]?.last_vote_date === today ? fingerprintTrackers[fp].free_votes_used : 0)
+        ));
 
     return res.json({
       success: true,
