@@ -52,6 +52,8 @@ export interface Transaction {
 export interface UserProfile {
   id: string;
   email: string;
+  full_name?: string;
+  role?: string;
   is_admin: boolean;
   super_votes_credit: number;
   created_at: string;

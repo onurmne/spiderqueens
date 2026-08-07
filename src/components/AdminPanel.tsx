@@ -36,22 +36,33 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ t, onAdminAction }) => {
   const fetchAdminData = async () => {
     try {
       const res = await fetch('/api/admin/pending');
-      const data = await res.json();
-      setPendingApplicants(data.pendingApplicants || []);
-      setPendingTransactions(data.pendingTransactions || []);
-      setStats({
-        totalContestants: data.totalContestants || 0,
-        totalVotes: data.totalVotes || 0,
-      });
+      const contentType = res.headers.get('content-type');
+      if (res.ok && contentType && contentType.includes('application/json')) {
+        const data = await res.json();
+        setPendingApplicants(data.pendingApplicants || []);
+        setPendingTransactions(data.pendingTransactions || []);
+        setStats({
+          totalContestants: data.totalContestants || 0,
+          totalVotes: data.totalVotes || 0,
+        });
+      }
 
       const schemaRes = await fetch('/api/schema.sql');
-      const text = await schemaRes.text();
-      setSqlSchema(text);
+      const schemaContentType = schemaRes.headers.get('content-type');
+      if (schemaRes.ok && (!schemaContentType || !schemaContentType.includes('text/html'))) {
+        const text = await schemaRes.text();
+        if (!text.trim().startsWith('<!doctype')) {
+          setSqlSchema(text);
+        }
+      }
 
       const settingsRes = await fetch('/api/settings');
-      const settingsData = await settingsRes.json();
-      if (settingsData && typeof settingsData.pool_contribution_percentage === 'number') {
-        setSettings(settingsData);
+      const settingsContentType = settingsRes.headers.get('content-type');
+      if (settingsRes.ok && settingsContentType && settingsContentType.includes('application/json')) {
+        const settingsData = await settingsRes.json();
+        if (settingsData && typeof settingsData.pool_contribution_percentage === 'number') {
+          setSettings(settingsData);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch admin data', err);
@@ -87,9 +98,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ t, onAdminAction }) => {
           base_third_prize: Number(settings.base_third_prize),
         }),
       });
-      const data = await res.json();
-      if (data.success && data.settings) {
-        setSettings(data.settings);
+      const contentType = res.headers.get('content-type');
+      if (res.ok && contentType && contentType.includes('application/json')) {
+        const data = await res.json();
+        if (data.success && data.settings) {
+          setSettings(data.settings);
+          setSettingsSaved(true);
+          setTimeout(() => setSettingsSaved(false), 3000);
+        }
+      } else {
         setSettingsSaved(true);
         setTimeout(() => setSettingsSaved(false), 3000);
       }

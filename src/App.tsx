@@ -12,6 +12,15 @@ import { InfoModal } from './components/InfoModal';
 import { UserProfileModal } from './components/UserProfileModal';
 import { AdminPanel } from './components/AdminPanel';
 import { getBrowserFingerprint } from './lib/fingerprint';
+import { 
+  fetchContestantsApi, 
+  fetchIpStatusApi, 
+  fetchUserProfileApi, 
+  castVoteApi, 
+  submitApplicationApi, 
+  createTransactionApi, 
+  adminActionApi 
+} from './lib/api';
 import { Heart, Trophy, Crown, Sparkles, Shield, Lock, ArrowRight } from 'lucide-react';
 
 const GUEST_PROFILE: UserProfile = {
@@ -58,27 +67,25 @@ export default function App() {
   const fetchData = async () => {
     try {
       const fpHash = getBrowserFingerprint();
-      const contestantsRes = await fetch('/api/contestants');
-      const contestantsData = await contestantsRes.json();
-      if (Array.isArray(contestantsData)) {
-        setContestants(contestantsData);
+      
+      const contestantsList = await fetchContestantsApi();
+      if (Array.isArray(contestantsList) && contestantsList.length > 0) {
+        setContestants(contestantsList);
       }
 
-      const ipRes = await fetch(`/api/ip-status?fingerprint=${encodeURIComponent(fpHash)}`);
-      const ipData = await ipRes.json();
+      const ipData = await fetchIpStatusApi(fpHash);
       if (typeof ipData.free_votes_remaining === 'number') {
         setFreeVotesRemaining(ipData.free_votes_remaining);
       }
 
-      const profileRes = await fetch('/api/user/profile');
-      const profileData = await profileRes.json();
+      const profileData = await fetchUserProfileApi();
       if (profileData && profileData.email && profileData.email.trim() !== '') {
         setUserProfile(profileData);
       } else {
         setUserProfile(GUEST_PROFILE);
       }
     } catch (err) {
-      console.error('Error fetching data from API server:', err);
+      console.error('Error fetching data:', err);
     } finally {
       setLoading(false);
     }
@@ -90,28 +97,14 @@ export default function App() {
 
   const handleVote = async (contestantId: string, isSuperVote: boolean) => {
     const fpHash = getBrowserFingerprint();
-    const res = await fetch('/api/vote', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        contestant_id: contestantId, 
-        is_super_vote: isSuperVote,
-        fingerprint_hash: fpHash
-      }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      throw new Error(data.error || data.message || 'Voting failed');
-    }
+    const data = await castVoteApi(contestantId, isSuperVote, fpHash);
 
     if (data.is_super_vote) {
       setUserProfile((prev) => ({
         ...prev,
         super_votes_credit: data.super_votes_remaining,
       }));
-    } else {
+    } else if (typeof data.free_votes_remaining === 'number') {
       setFreeVotesRemaining(data.free_votes_remaining);
     }
 
@@ -127,17 +120,7 @@ export default function App() {
     photo_url: string;
     bio?: string;
   }) => {
-    const res = await fetch('/api/contestants/apply', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-
-    const result = await res.json();
-    if (!res.ok) {
-      throw new Error(result.error || 'Failed to submit application');
-    }
-
+    await submitApplicationApi(data);
     await fetchData();
   };
 
@@ -148,16 +131,7 @@ export default function App() {
     tx_hash_or_note?: string;
     crypto_asset?: CryptoAsset;
   }) => {
-    const res = await fetch('/api/transactions/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params),
-    });
-
-    const result = await res.json();
-    if (!res.ok) {
-      throw new Error(result.error || 'Transaction failed');
-    }
+    const result = await createTransactionApi(params);
 
     if (result.super_votes_credit !== undefined) {
       setUserProfile((prev) => ({
@@ -174,16 +148,7 @@ export default function App() {
     id: string;
     action: 'approve' | 'reject';
   }) => {
-    const res = await fetch('/api/admin/action', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params),
-    });
-
-    const result = await res.json();
-    if (!res.ok) {
-      throw new Error(result.error || 'Admin action failed');
-    }
+    const result = await adminActionApi(params);
 
     if (result.super_votes_credit !== undefined) {
       setUserProfile((prev) => ({
