@@ -1,0 +1,6 @@
+{
+  "name": "SpiderQueens",
+  "description": "Gamified viral cosplay and costume voting platform with prize pool countdown, multi-language support, super votes, and admin management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
