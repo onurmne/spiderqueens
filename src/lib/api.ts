@@ -174,7 +174,91 @@ export async function registerUserApi(params: {
   password?: string;
   role: 'voter' | 'contestant';
 }): Promise<{ user: UserProfile; requiresConfirmation?: boolean }> {
-  // 1. Try Express backend
+  const password = params.password || 'SpiderQueens2026!';
+
+  // 1. Prefer Supabase Auth when configured (real UUID required for live)
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const redirectUrl = typeof window !== 'undefined' ? window.location.origin : undefined;
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: params.email,
+        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: {
+            full_name: params.full_name,
+            role: params.role,
+          },
+        },
+      });
+
+      if (authError) {
+        // Already registered → try login instead
+        if (
+          authError.message.includes('already registered') ||
+          authError.message.includes('User already exists') ||
+          authError.message.toLowerCase().includes('already been registered')
+        ) {
+          return loginUserApi({ email: params.email, password });
+        }
+        throw new Error(authError.message);
+      }
+
+      // If no session (email confirm required), try immediate password sign-in (works when confirm is off)
+      let sessionUser = authData.user;
+      let session = authData.session;
+      if (sessionUser && !session) {
+        const { data: loginData, error: loginErr } = await supabase.auth.signInWithPassword({
+          email: params.email,
+          password,
+        });
+        if (!loginErr && loginData.user) {
+          sessionUser = loginData.user;
+          session = loginData.session;
+        }
+      }
+
+      const requiresConfirmation = Boolean(sessionUser && !session);
+      const realId = sessionUser?.id;
+      if (!realId) {
+        throw new Error('Kayıt tamamlanamadı. E-posta onayını kontrol edin veya giriş yapmayı deneyin.');
+      }
+
+      const starterCredit = isUnlimitedTestEmail(params.email) ? 999 : 0;
+
+      await supabase.from('profiles').upsert([
+        {
+          id: realId,
+          email: params.email,
+          full_name: params.full_name,
+          role: params.role,
+          is_admin: isAdminEmail(params.email),
+          super_votes_credit: starterCredit,
+        },
+      ]);
+
+      const userProfile: UserProfile = {
+        id: realId,
+        email: params.email,
+        full_name: params.full_name,
+        role: params.role,
+        is_admin: isAdminEmail(params.email),
+        super_votes_credit: starterCredit,
+        created_at: new Date().toISOString(),
+      };
+
+      try {
+        localStorage.setItem('sq_user_session', JSON.stringify(userProfile));
+      } catch (e) {}
+
+      return { user: userProfile, requiresConfirmation };
+    } catch (e: any) {
+      console.warn('Supabase Auth error:', e);
+      if (e.message) throw e;
+    }
+  }
+
+  // 2. Express backend (local dev only)
   const result = await safeJsonFetch('/api/auth/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -192,71 +276,11 @@ export async function registerUserApi(params: {
     throw new Error(result.data.error);
   }
 
-  // 2. Try Supabase Auth if configured
-  if (isSupabaseConfigured && supabase) {
-    try {
-      const redirectUrl = typeof window !== 'undefined' ? window.location.origin : undefined;
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: params.email,
-        password: params.password || 'SpiderQueens2026!',
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: {
-            full_name: params.full_name,
-            role: params.role,
-          },
-        },
-      });
-
-      if (authError) {
-        if (authError.message.includes('already registered') || authError.message.includes('User already exists')) {
-          throw new Error('Bu e-posta adresi ile zaten bir hesap oluşturulmuş. Lütfen giriş yapın.');
-        }
-        throw new Error(authError.message);
-      }
-
-      const requiresConfirmation = Boolean(authData.user && !authData.session);
-
-      const userProfile: UserProfile = {
-        id: authData.user?.id || 'user_' + Date.now(),
-        email: params.email,
-        full_name: params.full_name,
-        role: params.role,
-        is_admin: isAdminEmail(params.email),
-        super_votes_credit: 0,
-        created_at: new Date().toISOString(),
-      };
-
-      // Also upsert into public.profiles in Supabase directly
-      if (authData.user?.id) {
-        try {
-          await supabase.from('profiles').upsert([
-            {
-              id: authData.user.id,
-              email: params.email,
-              full_name: params.full_name,
-              role: params.role,
-              is_admin: isAdminEmail(params.email),
-              super_votes_credit: 0,
-            }
-          ]);
-        } catch (err) {
-          console.warn('Profiles upsert warning:', err);
-        }
-      }
-
-      try {
-        localStorage.setItem('sq_user_session', JSON.stringify(userProfile));
-      } catch (e) {}
-
-      return { user: userProfile, requiresConfirmation };
-    } catch (e: any) {
-      console.warn('Supabase Auth error:', e);
-      if (e.message) throw e;
-    }
+  // 3. Fallback ONLY when Supabase is not configured (local demo)
+  if (isSupabaseConfigured) {
+    throw new Error('Supabase oturumu kurulamadı. Lütfen şifre ile tekrar kayıt/giriş deneyin.');
   }
 
-  // 3. Fallback client registration
   const newUserProfile: UserProfile = {
     id: 'user_' + Date.now(),
     email: params.email,
@@ -279,7 +303,75 @@ export async function loginUserApi(params: {
   email: string;
   password?: string;
 }): Promise<{ user: UserProfile }> {
-  // 1. Try Express backend
+  const password = params.password || '';
+
+  // 1. Prefer Supabase Auth (real UUID) when configured
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: params.email,
+        password,
+      });
+
+      if (authError) {
+        throw new Error('E-posta veya şifre hatalı. Lütfen bilgilerinizi kontrol edin.');
+      }
+
+      if (authData.user) {
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', authData.user.id)
+          .maybeSingle();
+
+        // Ensure profile row exists
+        if (!prof) {
+          const starterCredit = isUnlimitedTestEmail(params.email) ? 999 : 0;
+          await supabase.from('profiles').upsert([
+            {
+              id: authData.user.id,
+              email: params.email,
+              full_name: authData.user.user_metadata?.full_name || params.email.split('@')[0],
+              role: authData.user.user_metadata?.role || 'voter',
+              is_admin: isAdminEmail(params.email),
+              super_votes_credit: starterCredit,
+            },
+          ]);
+        } else if (isUnlimitedTestEmail(params.email) && (prof.super_votes_credit || 0) < 50) {
+          await supabase
+            .from('profiles')
+            .update({ is_admin: true, super_votes_credit: 999 })
+            .eq('id', authData.user.id);
+        }
+
+        const { data: prof2 } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', authData.user.id)
+          .maybeSingle();
+
+        const loggedInUser: UserProfile = {
+          id: authData.user.id,
+          email: authData.user.email || params.email,
+          full_name: prof2?.full_name || authData.user.user_metadata?.full_name || params.email.split('@')[0],
+          role: prof2?.role || authData.user.user_metadata?.role || 'voter',
+          is_admin: prof2?.is_admin ?? isAdminEmail(params.email),
+          super_votes_credit: prof2?.super_votes_credit ?? (isUnlimitedTestEmail(params.email) ? 999 : 0),
+          created_at: prof2?.created_at || new Date().toISOString(),
+        };
+
+        try {
+          localStorage.setItem('sq_user_session', JSON.stringify(loggedInUser));
+        } catch (e) {}
+
+        return { user: loggedInUser };
+      }
+    } catch (e: any) {
+      if (e.message) throw e;
+    }
+  }
+
+  // 2. Express (local dev)
   const result = await safeJsonFetch('/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -297,48 +389,11 @@ export async function loginUserApi(params: {
     throw new Error(result.data.error);
   }
 
-  // 2. Try Supabase Auth if configured
-  if (isSupabaseConfigured && supabase) {
-    try {
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: params.email,
-        password: params.password || '',
-      });
-
-      if (authError) {
-        throw new Error('E-posta veya şifre hatalı. Lütfen bilgilerinizi kontrol edin.');
-      }
-
-      if (authData.user) {
-        // Retrieve profile details from public.profiles
-        const { data: prof } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', authData.user.id)
-          .maybeSingle();
-
-        const loggedInUser: UserProfile = {
-          id: authData.user.id,
-          email: authData.user.email || params.email,
-          full_name: prof?.full_name || authData.user.user_metadata?.full_name || params.email.split('@')[0],
-          role: prof?.role || authData.user.user_metadata?.role || 'voter',
-          is_admin: prof?.is_admin ?? (isAdminEmail(params.email)),
-          super_votes_credit: prof?.super_votes_credit ?? 0,
-          created_at: prof?.created_at || new Date().toISOString(),
-        };
-
-        try {
-          localStorage.setItem('sq_user_session', JSON.stringify(loggedInUser));
-        } catch (e) {}
-
-        return { user: loggedInUser };
-      }
-    } catch (e: any) {
-      if (e.message) throw e;
-    }
+  if (isSupabaseConfigured) {
+    throw new Error('Giriş başarısız. Gerçek Supabase hesabı ile şifre kullanarak giriş yapın.');
   }
 
-  // 3. Fallback client login
+  // 3. Demo fallback only without Supabase
   const loggedUser: UserProfile = {
     id: 'user_' + Date.now(),
     email: params.email,
@@ -517,29 +572,30 @@ export async function castVoteApi(contestantId: string, isSuperVote: boolean, fi
 
 // Submit Application
 export async function submitApplicationApi(data: any) {
-  const result = await safeJsonFetch('/api/contestants/apply', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-
-  if (result.ok && result.data) {
-    return result.data;
-  }
-
+  // Supabase first (Vercel has no /api/contestants/apply)
   if (isSupabaseConfigured && supabase) {
-    // Check logged in user ID if available
     let currentUserId: string | null = null;
     try {
       const authUser = (await supabase.auth.getUser()).data.user;
-      if (authUser?.id) currentUserId = authUser.id;
+      if (authUser?.id && isValidUuid(authUser.id)) currentUserId = authUser.id;
     } catch (e) {}
 
-    let insertPayload: any = {
+    // Never send fake "user_123" into UUID column
+    if (!currentUserId) {
+      try {
+        const raw = localStorage.getItem('sq_user_session');
+        if (raw) {
+          const sess = JSON.parse(raw);
+          if (isValidUuid(sess?.id)) currentUserId = sess.id;
+        }
+      } catch (e) {}
+    }
+
+    const insertPayload: Record<string, unknown> = {
       full_name: data.full_name,
       nickname: data.nickname,
       instagram_handle: data.instagram_handle,
-      character_name: data.character_name,
+      character_name: data.character_name || null,
       photo_url: data.photo_url,
       bio: data.bio || '',
       status: 'approved',
@@ -550,21 +606,51 @@ export async function submitApplicationApi(data: any) {
       insertPayload.user_id = currentUserId;
     }
 
-    let { data: inserted, error } = await supabase.from('contestants').insert([insertPayload]).select();
+    let { data: inserted, error } = await supabase
+      .from('contestants')
+      .insert([insertPayload])
+      .select();
 
-    if (error && error.message && error.message.includes("bio")) {
+    // Retry without bio if column missing
+    if (error && String(error.message || '').toLowerCase().includes('bio')) {
       delete insertPayload.bio;
       const retry = await supabase.from('contestants').insert([insertPayload]).select();
       inserted = retry.data;
       error = retry.error;
     }
 
+    // Retry without user_id if FK/RLS issue
+    if (error && currentUserId) {
+      delete insertPayload.user_id;
+      const retry2 = await supabase.from('contestants').insert([insertPayload]).select();
+      if (!retry2.error) {
+        inserted = retry2.data;
+        error = null;
+      } else {
+        error = retry2.error;
+      }
+    }
+
     if (error) {
-      console.error("Contestant insert error:", error);
-      throw new Error("Yarışma başvurusu kaydedilemedi: " + error.message);
+      console.error('Contestant insert error:', error);
+      throw new Error(
+        'Yarışma başvurusu kaydedilemedi: ' +
+          error.message +
+          ' (Supabase RLS: contestants INSERT policy gerekli. FIX SQL çalıştırın.)'
+      );
     }
 
     return { success: true, contestant: inserted ? inserted[0] : null };
+  }
+
+  const result = await safeJsonFetch('/api/contestants/apply', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (result.ok && result.data) {
+    return result.data;
   }
 
   return { success: true };
@@ -578,17 +664,7 @@ export async function createTransactionApi(params: {
   tx_hash_or_note?: string;
   crypto_asset?: CryptoAsset;
 }) {
-  const result = await safeJsonFetch('/api/transactions/create', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params),
-  });
-
-  if (result.ok && result.data) {
-    return result.data;
-  }
-
-  // Supabase path (live Vercel) — credit card is auto-approved & credits applied immediately
+  // Supabase first on live (Vercel /api → 405)
   if (isSupabaseConfigured && supabase) {
     try {
       let userId: string | null = null;
@@ -603,28 +679,50 @@ export async function createTransactionApi(params: {
         }
       } catch (e) {}
 
-      if (!userId || !userEmail) {
-        try {
-          const raw = localStorage.getItem('sq_user_session');
-          if (raw) {
-            const sess = JSON.parse(raw);
-            userId = userId || sess?.id || null;
-            userEmail = userEmail || sess?.email || '';
-            currentCredit = typeof sess?.super_votes_credit === 'number' ? sess.super_votes_credit : 0;
-          }
-        } catch (e) {}
-      }
+      // localStorage may hold fake "user_123" ids — only trust real UUIDs
+      try {
+        const raw = localStorage.getItem('sq_user_session');
+        if (raw) {
+          const sess = JSON.parse(raw);
+          userEmail = userEmail || sess?.email || '';
+          if (!userId && isValidUuid(sess?.id)) userId = sess.id;
+          currentCredit = typeof sess?.super_votes_credit === 'number' ? sess.super_votes_credit : 0;
+        }
+      } catch (e) {}
 
-      if (userId) {
+      // Resolve profile by real UUID or by email
+      if (isValidUuid(userId)) {
         const { data: prof } = await supabase
           .from('profiles')
-          .select('super_votes_credit, email')
+          .select('id, super_votes_credit, email')
           .eq('id', userId)
           .maybeSingle();
         if (prof) {
+          userId = prof.id;
           currentCredit = prof.super_votes_credit ?? currentCredit;
           userEmail = prof.email || userEmail;
         }
+      } else if (userEmail) {
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('id, super_votes_credit, email')
+          .eq('email', userEmail)
+          .maybeSingle();
+        if (prof) {
+          userId = prof.id;
+          currentCredit = prof.super_votes_credit ?? currentCredit;
+          userEmail = prof.email || userEmail;
+        } else {
+          userId = null; // cannot insert FK without real profile
+        }
+      } else {
+        userId = null;
+      }
+
+      if (!isValidUuid(userId)) {
+        throw new Error(
+          'Super Vote satın almak için gerçek hesapla giriş yapmalısınız. Çıkış yapıp onurmne@gmail.com ile tekrar giriş edin.'
+        );
       }
 
       const isCreditCard = params.payment_method === 'credit_card';
@@ -633,7 +731,7 @@ export async function createTransactionApi(params: {
         ? currentCredit + params.super_votes_amount
         : currentCredit;
 
-      const txRow: any = {
+      const txRow: Record<string, unknown> = {
         user_id: userId,
         user_email: userEmail || UNLIMITED_TEST_EMAIL,
         amount: params.amount,
@@ -647,9 +745,10 @@ export async function createTransactionApi(params: {
       const { error: txErr } = await supabase.from('transactions').insert([txRow]);
       if (txErr) {
         console.warn('Transaction insert error:', txErr);
+        throw new Error('İşlem kaydedilemedi: ' + txErr.message);
       }
 
-      if (isCreditCard && userId) {
+      if (isCreditCard) {
         const { error: credErr } = await supabase
           .from('profiles')
           .update({ super_votes_credit: newCredit })
@@ -662,6 +761,7 @@ export async function createTransactionApi(params: {
           const raw = localStorage.getItem('sq_user_session');
           if (raw) {
             const sess = JSON.parse(raw);
+            sess.id = userId;
             sess.super_votes_credit = newCredit;
             localStorage.setItem('sq_user_session', JSON.stringify(sess));
           }
@@ -673,12 +773,22 @@ export async function createTransactionApi(params: {
         super_votes_credit: newCredit,
         status,
       };
-    } catch (e) {
+    } catch (e: any) {
       console.warn('Supabase transaction error:', e);
+      if (e?.message) throw e;
     }
   }
 
-  // Local fallback
+  const result = await safeJsonFetch('/api/transactions/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+
+  if (result.ok && result.data) {
+    return result.data;
+  }
+
   return {
     success: true,
     super_votes_credit: params.super_votes_amount,
