@@ -1,6 +1,20 @@
 import { Contestant, UserProfile, Transaction, PaymentMethod, CryptoAsset } from '../types';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 
+/** Test / owner email: unlimited free votes, auto admin, smooth registration testing */
+export const UNLIMITED_TEST_EMAIL = 'onurmne@gmail.com';
+
+export function isUnlimitedTestEmail(email?: string | null): boolean {
+  if (!email) return false;
+  return email.trim().toLowerCase() === UNLIMITED_TEST_EMAIL.toLowerCase();
+}
+
+export function isAdminEmail(email?: string | null): boolean {
+  if (!email) return false;
+  const e = email.trim().toLowerCase();
+  return e === 'admin@spiderqueens.com' || e === UNLIMITED_TEST_EMAIL.toLowerCase();
+}
+
 export const INITIAL_FALLBACK_CONTESTANTS: Contestant[] = [
   {
     id: 'c1',
@@ -114,6 +128,17 @@ export async function fetchContestantsApi(): Promise<Contestant[]> {
 
 // Fetch IP & Fingerprint Status
 export async function fetchIpStatusApi(fingerprintHash: string) {
+  // Unlimited test account — never rate-limit
+  try {
+    const raw = localStorage.getItem('sq_user_session');
+    if (raw) {
+      const sess = JSON.parse(raw);
+      if (isUnlimitedTestEmail(sess?.email)) {
+        return { free_votes_remaining: 9999, free_votes_used: 0 };
+      }
+    }
+  } catch (e) {}
+
   const result = await safeJsonFetch(`/api/ip-status?fingerprint=${encodeURIComponent(fingerprintHash)}`);
   if (result.ok && result.data) {
     return result.data;
@@ -197,7 +222,7 @@ export async function registerUserApi(params: {
         email: params.email,
         full_name: params.full_name,
         role: params.role,
-        is_admin: params.email.toLowerCase() === 'admin@spiderqueens.com',
+        is_admin: isAdminEmail(params.email),
         super_votes_credit: 0,
         created_at: new Date().toISOString(),
       };
@@ -211,7 +236,7 @@ export async function registerUserApi(params: {
               email: params.email,
               full_name: params.full_name,
               role: params.role,
-              is_admin: params.email.toLowerCase() === 'admin@spiderqueens.com',
+              is_admin: isAdminEmail(params.email),
               super_votes_credit: 0,
             }
           ]);
@@ -237,7 +262,7 @@ export async function registerUserApi(params: {
     email: params.email,
     full_name: params.full_name,
     role: params.role,
-    is_admin: params.email.toLowerCase() === 'admin@spiderqueens.com',
+    is_admin: isAdminEmail(params.email),
     super_votes_credit: 0,
     created_at: new Date().toISOString(),
   };
@@ -297,7 +322,7 @@ export async function loginUserApi(params: {
           email: authData.user.email || params.email,
           full_name: prof?.full_name || authData.user.user_metadata?.full_name || params.email.split('@')[0],
           role: prof?.role || authData.user.user_metadata?.role || 'voter',
-          is_admin: prof?.is_admin ?? (params.email.toLowerCase() === 'admin@spiderqueens.com'),
+          is_admin: prof?.is_admin ?? (isAdminEmail(params.email)),
           super_votes_credit: prof?.super_votes_credit ?? 0,
           created_at: prof?.created_at || new Date().toISOString(),
         };
@@ -319,7 +344,7 @@ export async function loginUserApi(params: {
     email: params.email,
     full_name: params.email.split('@')[0],
     role: 'voter',
-    is_admin: params.email.toLowerCase() === 'admin@spiderqueens.com',
+    is_admin: isAdminEmail(params.email),
     super_votes_credit: 0,
     created_at: new Date().toISOString(),
   };
@@ -333,6 +358,42 @@ export async function loginUserApi(params: {
 
 // Cast Vote
 export async function castVoteApi(contestantId: string, isSuperVote: boolean, fingerprintHash: string) {
+  // Resolve current user (session) early for test-email bypass + user_id on vote row
+  let currentUserId: string | null = null;
+  let currentEmail: string | null = null;
+  let currentSuperCredit = 0;
+
+  try {
+    const raw = localStorage.getItem('sq_user_session');
+    if (raw) {
+      const sess = JSON.parse(raw);
+      currentUserId = sess?.id || null;
+      currentEmail = sess?.email || null;
+      currentSuperCredit = typeof sess?.super_votes_credit === 'number' ? sess.super_votes_credit : 0;
+    }
+  } catch (e) {}
+
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const authUser = (await supabase.auth.getUser()).data.user;
+      if (authUser) {
+        currentUserId = authUser.id;
+        currentEmail = authUser.email || currentEmail;
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('super_votes_credit, email')
+          .eq('id', authUser.id)
+          .maybeSingle();
+        if (prof) {
+          currentSuperCredit = prof.super_votes_credit ?? currentSuperCredit;
+          currentEmail = prof.email || currentEmail;
+        }
+      }
+    } catch (e) {}
+  }
+
+  const unlimited = isUnlimitedTestEmail(currentEmail);
+
   const result = await safeJsonFetch('/api/vote', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -340,6 +401,8 @@ export async function castVoteApi(contestantId: string, isSuperVote: boolean, fi
       contestant_id: contestantId,
       is_super_vote: isSuperVote,
       fingerprint_hash: fingerprintHash,
+      voter_email: currentEmail,
+      unlimited_test: unlimited,
     }),
   });
 
@@ -347,54 +410,87 @@ export async function castVoteApi(contestantId: string, isSuperVote: boolean, fi
     return result.data;
   }
 
-  // Direct Supabase execution if Express API is unavailable (e.g. Vercel static host)
+  // Direct Supabase path (Vercel live: Express /api is not available)
   if (isSupabaseConfigured && supabase) {
     try {
       const voteVal = isSuperVote ? 5 : 1;
-      
-      // Step A: Insert record into votes table
-      const { error: insertErr } = await supabase.from('votes').insert([
-        {
-          contestant_id: contestantId,
-          is_super_vote: isSuperVote,
-          voter_ip: 'client_app',
-          fingerprint_hash: fingerprintHash || 'sqfp_default',
-        }
-      ]);
 
-      // Step B: If insert fails or trigger didn't run, execute increment_vote_count RPC
-      if (insertErr) {
-        const { error: rpcErr } = await supabase.rpc('increment_vote_count', {
-          contestant_id: contestantId,
-          is_super: isSuperVote
-        });
-
-        // Step C: Fallback to direct update if RPC is missing
-        if (rpcErr) {
-          const { data: currentContestant } = await supabase
-            .from('contestants')
-            .select('votes_count')
-            .eq('id', contestantId)
-            .single();
-
-          if (currentContestant) {
-            await supabase
-              .from('contestants')
-              .update({ votes_count: (currentContestant.votes_count || 0) + voteVal })
-              .eq('id', contestantId);
-          }
+      if (isSuperVote) {
+        if (!unlimited && currentSuperCredit < 1) {
+          throw new Error('insufficient_super_votes');
         }
       }
-    } catch (e) {
+
+      // Insert vote row (trigger should increment votes_count if SECURITY DEFINER)
+      const insertPayload: any = {
+        contestant_id: contestantId,
+        is_super_vote: isSuperVote,
+        voter_ip: unlimited ? 'test_unlimited' : 'client_app',
+        fingerprint_hash: fingerprintHash || 'sqfp_default',
+      };
+      if (currentUserId) insertPayload.user_id = currentUserId;
+
+      const { error: insertErr } = await supabase.from('votes').insert([insertPayload]);
+
+      // Always ensure votes_count is incremented via SECURITY DEFINER RPC
+      // (covers cases where trigger is missing / not yet migrated / RLS blocked)
+      const { error: rpcErr } = await supabase.rpc('increment_vote_count', {
+        contestant_id: contestantId,
+        is_super: isSuperVote,
+      });
+
+      if (rpcErr && insertErr) {
+        // Last-resort direct update (requires permissive UPDATE policy)
+        const { data: currentContestant } = await supabase
+          .from('contestants')
+          .select('votes_count')
+          .eq('id', contestantId)
+          .single();
+
+        if (currentContestant) {
+          await supabase
+            .from('contestants')
+            .update({ votes_count: (currentContestant.votes_count || 0) + voteVal })
+            .eq('id', contestantId);
+        }
+      }
+
+      let newSuperRemaining = currentSuperCredit;
+      if (isSuperVote && currentUserId) {
+        newSuperRemaining = Math.max(0, currentSuperCredit - 1);
+        await supabase
+          .from('profiles')
+          .update({ super_votes_credit: newSuperRemaining })
+          .eq('id', currentUserId);
+
+        try {
+          const raw = localStorage.getItem('sq_user_session');
+          if (raw) {
+            const sess = JSON.parse(raw);
+            sess.super_votes_credit = newSuperRemaining;
+            localStorage.setItem('sq_user_session', JSON.stringify(sess));
+          }
+        } catch (e) {}
+      }
+
+      return {
+        success: true,
+        is_super_vote: isSuperVote,
+        votes_added: voteVal,
+        free_votes_remaining: unlimited ? 9999 : 4,
+        super_votes_remaining: isSuperVote ? newSuperRemaining : currentSuperCredit,
+      };
+    } catch (e: any) {
       console.warn('Supabase vote recording error:', e);
+      if (e?.message === 'insufficient_super_votes') throw e;
     }
   }
 
   return {
     success: true,
     is_super_vote: isSuperVote,
-    free_votes_remaining: 4,
-    super_votes_remaining: 0,
+    free_votes_remaining: unlimited ? 9999 : 4,
+    super_votes_remaining: isSuperVote ? Math.max(0, currentSuperCredit - 1) : currentSuperCredit,
   };
 }
 
@@ -471,6 +567,97 @@ export async function createTransactionApi(params: {
     return result.data;
   }
 
+  // Supabase path (live Vercel) — credit card is auto-approved & credits applied immediately
+  if (isSupabaseConfigured && supabase) {
+    try {
+      let userId: string | null = null;
+      let userEmail = '';
+      let currentCredit = 0;
+
+      try {
+        const authUser = (await supabase.auth.getUser()).data.user;
+        if (authUser) {
+          userId = authUser.id;
+          userEmail = authUser.email || '';
+        }
+      } catch (e) {}
+
+      if (!userId || !userEmail) {
+        try {
+          const raw = localStorage.getItem('sq_user_session');
+          if (raw) {
+            const sess = JSON.parse(raw);
+            userId = userId || sess?.id || null;
+            userEmail = userEmail || sess?.email || '';
+            currentCredit = typeof sess?.super_votes_credit === 'number' ? sess.super_votes_credit : 0;
+          }
+        } catch (e) {}
+      }
+
+      if (userId) {
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('super_votes_credit, email')
+          .eq('id', userId)
+          .maybeSingle();
+        if (prof) {
+          currentCredit = prof.super_votes_credit ?? currentCredit;
+          userEmail = prof.email || userEmail;
+        }
+      }
+
+      const isCreditCard = params.payment_method === 'credit_card';
+      const status = isCreditCard ? 'approved' : 'pending';
+      const newCredit = isCreditCard
+        ? currentCredit + params.super_votes_amount
+        : currentCredit;
+
+      const txRow: any = {
+        user_id: userId,
+        user_email: userEmail || UNLIMITED_TEST_EMAIL,
+        amount: params.amount,
+        super_votes_amount: params.super_votes_amount,
+        payment_method: params.payment_method,
+        status,
+        tx_hash_or_note: params.tx_hash_or_note || null,
+        crypto_asset: params.crypto_asset || null,
+      };
+
+      const { error: txErr } = await supabase.from('transactions').insert([txRow]);
+      if (txErr) {
+        console.warn('Transaction insert error:', txErr);
+      }
+
+      if (isCreditCard && userId) {
+        const { error: credErr } = await supabase
+          .from('profiles')
+          .update({ super_votes_credit: newCredit })
+          .eq('id', userId);
+        if (credErr) {
+          console.warn('Credit update error:', credErr);
+        }
+
+        try {
+          const raw = localStorage.getItem('sq_user_session');
+          if (raw) {
+            const sess = JSON.parse(raw);
+            sess.super_votes_credit = newCredit;
+            localStorage.setItem('sq_user_session', JSON.stringify(sess));
+          }
+        } catch (e) {}
+      }
+
+      return {
+        success: true,
+        super_votes_credit: newCredit,
+        status,
+      };
+    } catch (e) {
+      console.warn('Supabase transaction error:', e);
+    }
+  }
+
+  // Local fallback
   return {
     success: true,
     super_votes_credit: params.super_votes_amount,
