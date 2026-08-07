@@ -73,16 +73,20 @@ export default function App() {
         setContestants(contestantsList);
       }
 
-      const ipData = await fetchIpStatusApi(fpHash);
-      if (typeof ipData.free_votes_remaining === 'number') {
-        setFreeVotesRemaining(ipData.free_votes_remaining);
-      }
-
       const profileData = await fetchUserProfileApi();
       if (profileData && profileData.email && profileData.email.trim() !== '') {
         setUserProfile(profileData);
       } else {
         setUserProfile(GUEST_PROFILE);
+      }
+
+      const ipData = await fetchIpStatusApi(fpHash);
+      // onurmne@gmail.com — unlimited free votes for live testing
+      const emailLower = (profileData?.email || '').toLowerCase();
+      if (emailLower === 'onurmne@gmail.com') {
+        setFreeVotesRemaining(9999);
+      } else if (typeof ipData.free_votes_remaining === 'number') {
+        setFreeVotesRemaining(ipData.free_votes_remaining);
       }
     } catch (err) {
       console.error('Error fetching data:', err);
@@ -299,9 +303,15 @@ export default function App() {
         onClose={() => setIsAuthOpen(false)}
         onLoginSuccess={(user) => {
           setUserProfile(user);
+          if ((user?.email || '').toLowerCase() === 'onurmne@gmail.com') {
+            setFreeVotesRemaining(9999);
+          }
         }}
         onRegisterSuccess={(user, role) => {
           setUserProfile(user);
+          if ((user?.email || '').toLowerCase() === 'onurmne@gmail.com') {
+            setFreeVotesRemaining(9999);
+          }
           if (role === 'contestant') {
             setActiveTab('join');
           }
