@@ -109,6 +109,15 @@ export default function App() {
       throw new Error('Oy kullanabilmek için lütfen önce giriş yapın veya kayıt olun.');
     }
 
+    // Immediately increment vote count in UI for instant real-time feedback
+    setContestants((prev) =>
+      prev.map((c) =>
+        c.id === contestantId
+          ? { ...c, votes_count: c.votes_count + (isSuperVote ? 5 : 1) }
+          : c
+      )
+    );
+
     const fpHash = getBrowserFingerprint();
     const data = await castVoteApi(contestantId, isSuperVote, fpHash);
 
@@ -121,7 +130,7 @@ export default function App() {
       setFreeVotesRemaining(data.free_votes_remaining);
     }
 
-    // Refresh contestants
+    // Refresh contestants from server
     await fetchData();
   };
 

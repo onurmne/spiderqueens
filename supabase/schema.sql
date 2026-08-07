@@ -220,9 +220,11 @@ ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public profiles are viewable by everyone" ON public.profiles FOR SELECT USING (true);
 CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
 
--- Contestants: Approved viewable by everyone
+-- Contestants: Approved viewable by everyone, anyone can submit application
 CREATE POLICY "Approved contestants viewable by everyone" ON public.contestants FOR SELECT USING (status = 'approved' OR auth.uid() = user_id OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
-CREATE POLICY "Authenticated users can submit contestant application" ON public.contestants FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Authenticated users can submit contestant application" ON public.contestants;
+DROP POLICY IF EXISTS "Anyone can submit contestant application" ON public.contestants;
+CREATE POLICY "Anyone can submit contestant application" ON public.contestants FOR INSERT WITH CHECK (true);
 CREATE POLICY "Admins can update contestant status" ON public.contestants FOR UPDATE USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
 
 -- Votes: Public insert, public view
@@ -249,7 +251,7 @@ BEGIN
     NEW.id,
     NEW.email,
     COALESCE((NEW.raw_user_meta_data->>'is_admin')::boolean, FALSE),
-    15
+    0
   )
   ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email;
   RETURN NEW;

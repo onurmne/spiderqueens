@@ -148,7 +148,7 @@ export async function registerUserApi(params: {
   email: string;
   password?: string;
   role: 'voter' | 'contestant';
-}): Promise<{ user: UserProfile }> {
+}): Promise<{ user: UserProfile; requiresConfirmation?: boolean }> {
   // 1. Try Express backend
   const result = await safeJsonFetch('/api/auth/register', {
     method: 'POST',
@@ -170,10 +170,12 @@ export async function registerUserApi(params: {
   // 2. Try Supabase Auth if configured
   if (isSupabaseConfigured && supabase) {
     try {
+      const redirectUrl = typeof window !== 'undefined' ? window.location.origin : undefined;
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: params.email,
         password: params.password || 'SpiderQueens2026!',
         options: {
+          emailRedirectTo: redirectUrl,
           data: {
             full_name: params.full_name,
             role: params.role,
@@ -183,13 +185,15 @@ export async function registerUserApi(params: {
 
       if (authError) throw new Error(authError.message);
 
+      const requiresConfirmation = Boolean(authData.user && !authData.session);
+
       const userProfile: UserProfile = {
         id: authData.user?.id || 'user_' + Date.now(),
         email: params.email,
         full_name: params.full_name,
         role: params.role,
         is_admin: params.email.toLowerCase() === 'admin@spiderqueens.com',
-        super_votes_credit: params.role === 'contestant' ? 25 : 15,
+        super_votes_credit: 0,
         created_at: new Date().toISOString(),
       };
 
@@ -197,7 +201,7 @@ export async function registerUserApi(params: {
         localStorage.setItem('sq_user_session', JSON.stringify(userProfile));
       } catch (e) {}
 
-      return { user: userProfile };
+      return { user: userProfile, requiresConfirmation };
     } catch (e: any) {
       console.warn('Supabase Auth error:', e);
       if (e.message && !e.message.includes('Fetch')) {
@@ -213,7 +217,7 @@ export async function registerUserApi(params: {
     full_name: params.full_name,
     role: params.role,
     is_admin: params.email.toLowerCase() === 'admin@spiderqueens.com',
-    super_votes_credit: params.role === 'contestant' ? 25 : 15,
+    super_votes_credit: 0,
     created_at: new Date().toISOString(),
   };
 
@@ -262,7 +266,7 @@ export async function loginUserApi(params: {
           full_name: authData.user.user_metadata?.full_name || params.email.split('@')[0],
           role: authData.user.user_metadata?.role || 'voter',
           is_admin: params.email.toLowerCase() === 'admin@spiderqueens.com',
-          super_votes_credit: 15,
+          super_votes_credit: 0,
           created_at: new Date().toISOString(),
         };
 
@@ -282,7 +286,7 @@ export async function loginUserApi(params: {
     full_name: params.email.split('@')[0],
     role: 'voter',
     is_admin: params.email.toLowerCase() === 'admin@spiderqueens.com',
-    super_votes_credit: 15,
+    super_votes_credit: 0,
     created_at: new Date().toISOString(),
   };
 

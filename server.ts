@@ -299,7 +299,7 @@ app.post('/api/auth/register', (req: Request, res: Response) => {
     full_name,
     role: role === 'contestant' ? 'contestant' : 'voter',
     is_admin: email.toLowerCase() === 'admin@spiderqueens.com',
-    super_votes_credit: role === 'contestant' ? 25 : 15,
+    super_votes_credit: 0,
     created_at: new Date().toISOString()
   };
 
@@ -330,7 +330,7 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
     full_name: email.split('@')[0],
     role: 'voter',
     is_admin: email.toLowerCase() === 'admin@spiderqueens.com',
-    super_votes_credit: 15,
+    super_votes_credit: 0,
     created_at: new Date().toISOString()
   };
 

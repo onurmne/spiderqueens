@@ -26,6 +26,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
   if (!isOpen) return null;
 
@@ -33,10 +34,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     e.preventDefault();
     setLoading(true);
     setErrorMsg('');
+    setSuccessMsg('');
 
     try {
       if (mode === 'register') {
-        const { user } = await registerUserApi({
+        const { user, requiresConfirmation } = await registerUserApi({
           full_name: fullName || email.split('@')[0],
           email,
           password,
@@ -44,7 +46,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         });
 
         onRegisterSuccess(user, role);
-        onClose();
+
+        if (requiresConfirmation) {
+          setSuccessMsg('Kayıt başarılı! E-posta adresinize (Spam klasörü dahil) doğrulama bağlantısı gönderildi. Lütfen e-postanızı onaylayın.');
+          setTimeout(() => {
+            onClose();
+          }, 3500);
+        } else {
+          onClose();
+        }
       } else {
         const { user } = await loginUserApi({ email, password });
 
@@ -114,6 +124,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {errorMsg && (
           <div className="mb-4 p-3 rounded-xl bg-red-950/80 border border-red-500/50 text-red-300 text-xs font-semibold">
             {errorMsg}
+          </div>
+        )}
+
+        {/* Form Success Message */}
+        {successMsg && (
+          <div className="mb-4 p-3 rounded-xl bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 text-xs font-semibold animate-pulse">
+            {successMsg}
           </div>
         )}
 

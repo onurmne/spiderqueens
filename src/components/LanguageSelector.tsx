@@ -51,8 +51,8 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
       </button>
 
       {isOpen && (
-        <div className="fixed right-3 top-14 sm:absolute sm:right-0 sm:top-full mt-2 w-48 rounded-2xl bg-[#0F0F12] border border-pink-500/40 shadow-[0_10px_30px_rgba(0,0,0,0.9)] backdrop-blur-2xl z-[9999] overflow-hidden max-w-[calc(100vw-24px)] animate-in fade-in slide-in-from-top-2 duration-150">
-          <div className="py-1.5 max-h-[70vh] overflow-y-auto">
+        <div className="absolute right-0 top-full mt-2 w-48 rounded-2xl bg-[#0F0F12] border border-pink-500/50 shadow-[0_20px_50px_rgba(0,0,0,0.95)] backdrop-blur-2xl z-[99999] overflow-hidden max-w-[calc(100vw-24px)] animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="py-1.5 max-h-[60vh] overflow-y-auto">
             {LANGUAGES.map((lang) => {
               const isSelected = lang.code === currentLang;
               return (
