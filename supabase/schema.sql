@@ -19,7 +19,7 @@ CREATE INDEX IF NOT EXISTS idx_profiles_email ON public.profiles(email);
 -- 2. CONTESTANTS TABLE
 CREATE TABLE IF NOT EXISTS public.contestants (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
   full_name TEXT NOT NULL,
   nickname TEXT NOT NULL,
   instagram_handle TEXT NOT NULL,
@@ -235,9 +235,37 @@ CREATE POLICY "Users create transactions" ON public.transactions FOR INSERT WITH
 CREATE POLICY "Admins update transactions" ON public.transactions FOR UPDATE USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
 
 -- ========================================================
--- INITIAL SEED DATA
+-- AUTOMATIC PROFILE CREATION TRIGGER FOR SUPABASE AUTH
 -- ========================================================
-INSERT INTO public.profiles (id, email, is_admin, super_votes_credit)
-VALUES ('00000000-0000-0000-0000-000000000001', 'admin@spiderqueens.com', true, 100)
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, is_admin, super_votes_credit)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE((NEW.raw_user_meta_data->>'is_admin')::boolean, FALSE),
+    15
+  )
+  ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- ========================================================
+-- INITIAL SEED DATA (APPROVED COSPLAYERS & ARENA CONTESTANTS)
+-- ========================================================
+INSERT INTO public.contestants (id, full_name, nickname, instagram_handle, character_name, photo_url, status, votes_count)
+VALUES 
+  ('c1000000-0000-0000-0000-000000000001', 'Elena Rostova', 'ValkyrieCosplay', '@valkyrie_cosplay', 'Cyberpunk Spider-Gwen', 'https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=1000&auto=format&fit=crop', 'approved', 342),
+  ('c2000000-0000-0000-0000-000000000002', 'Sakura Tanaka', 'KitsuneQueen', '@kitsune_queen', 'Neon Spider-Woman Jessica Drew', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=1000&auto=format&fit=crop', 'approved', 289),
+  ('c3000000-0000-0000-0000-000000000003', 'Aria Thorne', 'ShadowSpider', '@shadow_spider_official', 'Symbiote Silk / Black Cat Mashup', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=1000&auto=format&fit=crop', 'approved', 215),
+  ('c4000000-0000-0000-0000-000000000004', 'Chloe Bennett', 'BladeVixen', '@bladevixen', 'Cyber Blade Spider-Man 2099 Female', 'https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=1000&auto=format&fit=crop', 'approved', 178),
+  ('c5000000-0000-0000-0000-000000000005', 'Mayumi Sato', 'NebulaCos', '@nebula_cosplays', 'Gothic Lolita Spider-Queen', 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=1000&auto=format&fit=crop', 'approved', 142)
 ON CONFLICT (id) DO NOTHING;
 

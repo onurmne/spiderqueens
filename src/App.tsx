@@ -14,18 +14,22 @@ import { AdminPanel } from './components/AdminPanel';
 import { getBrowserFingerprint } from './lib/fingerprint';
 import { Heart, Trophy, Crown, Sparkles, Shield, Lock, ArrowRight } from 'lucide-react';
 
+const GUEST_PROFILE: UserProfile = {
+  id: '',
+  email: '',
+  full_name: 'Misafir Kullanıcı',
+  role: 'voter',
+  is_admin: false,
+  super_votes_credit: 0,
+  created_at: '',
+};
+
 export default function App() {
   const [currentLang, setCurrentLang] = useState<Language>('tr');
   const [activeTab, setActiveTab] = useState<string>('clash');
   const [contestants, setContestants] = useState<Contestant[]>([]);
   const [freeVotesRemaining, setFreeVotesRemaining] = useState<number>(5);
-  const [userProfile, setUserProfile] = useState<UserProfile>({
-    id: 'guest_voter_123',
-    email: 'voter@spiderqueens.com',
-    is_admin: false,
-    super_votes_credit: 15,
-    created_at: new Date().toISOString(),
-  });
+  const [userProfile, setUserProfile] = useState<UserProfile>(GUEST_PROFILE);
   const [isStoreOpen, setIsStoreOpen] = useState<boolean>(false);
   const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
   const [isProfileOpen, setIsProfileOpen] = useState<boolean>(false);
@@ -68,8 +72,10 @@ export default function App() {
 
       const profileRes = await fetch('/api/user/profile');
       const profileData = await profileRes.json();
-      if (profileData && profileData.id) {
+      if (profileData && profileData.email && profileData.email.trim() !== '') {
         setUserProfile(profileData);
+      } else {
+        setUserProfile(GUEST_PROFILE);
       }
     } catch (err) {
       console.error('Error fetching data from API server:', err);
@@ -321,14 +327,14 @@ export default function App() {
         isOpen={isProfileOpen}
         onClose={() => setIsProfileOpen(false)}
         userProfile={userProfile}
-        onLogout={() => {
-          setUserProfile({
-            id: 'guest_voter_' + Date.now(),
-            email: 'voter@spiderqueens.com',
-            is_admin: false,
-            super_votes_credit: 0,
-            created_at: new Date().toISOString(),
-          });
+        onLogout={async () => {
+          try {
+            await fetch('/api/auth/logout', { method: 'POST' });
+          } catch (e) {
+            console.error('Logout error', e);
+          }
+          setUserProfile(GUEST_PROFILE);
+          setIsProfileOpen(false);
         }}
         onOpenStore={() => setIsStoreOpen(true)}
       />

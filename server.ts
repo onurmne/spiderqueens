@@ -172,13 +172,13 @@ let registeredUsers: RegisteredUser[] = [
 ];
 
 let userProfile = {
-  id: 'guest_voter_' + Date.now(),
-  email: 'voter@spiderqueens.com',
+  id: '',
+  email: '',
   full_name: 'Guest Voter',
   role: 'voter' as 'voter' | 'contestant',
   is_admin: false,
-  super_votes_credit: 15,
-  created_at: new Date().toISOString()
+  super_votes_credit: 0,
+  created_at: ''
 };
 
 let transactions: TransactionData[] = [
@@ -338,6 +338,20 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
   userProfile = { ...newUser };
 
   res.json({ success: true, user: newUser });
+});
+
+// POST /api/auth/logout
+app.post('/api/auth/logout', (req: Request, res: Response) => {
+  userProfile = {
+    id: '',
+    email: '',
+    full_name: 'Guest Voter',
+    role: 'voter',
+    is_admin: false,
+    super_votes_credit: 0,
+    created_at: ''
+  };
+  res.json({ success: true });
 });
 
 // GET /api/user/profile

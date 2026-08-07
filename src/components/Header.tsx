@@ -28,7 +28,13 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenAuth,
   onOpenProfile,
 }) => {
-  const isLoggedIn = Boolean(userProfile.email && userProfile.email !== 'user@spiderqueens.com');
+  const isLoggedIn = Boolean(
+    userProfile && 
+    userProfile.email && 
+    userProfile.email.trim() !== '' && 
+    !userProfile.email.includes('guest') && 
+    !userProfile.email.includes('voter@spiderqueens.com')
+  );
 
   return (
     <header className="sticky top-0 z-50 bg-[#0F0F12]/95 backdrop-blur-md border-b border-white/10 shadow-2xl w-full">
@@ -134,15 +140,16 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Auth / Profile Button */}
             <button
+              id="btn-user-auth-profile"
               onClick={isLoggedIn ? onOpenProfile : onOpenAuth}
-              className={`px-2 sm:px-3.5 py-1.5 sm:py-2 rounded-xl border text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl border text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer ${
                 isLoggedIn
                   ? 'bg-pink-500/10 border-pink-500/30 text-pink-300 hover:bg-pink-500/20'
-                  : 'bg-white/5 hover:bg-white/10 border-white/10 text-white'
+                  : 'bg-gradient-to-r from-pink-600 to-purple-600 hover:brightness-110 border-pink-500/40 text-white shadow-md'
               }`}
             >
-              <UserCheck className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isLoggedIn ? 'text-pink-400' : 'text-gray-400'}`} />
-              <span className="hidden sm:inline">
+              <UserCheck className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isLoggedIn ? 'text-pink-400' : 'text-white'}`} />
+              <span className="text-[11px] sm:text-xs">
                 {isLoggedIn
                   ? userProfile.full_name || userProfile.email.split('@')[0]
                   : t.loginRegisterBtn}
