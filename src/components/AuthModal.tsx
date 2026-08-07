@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { TranslationDictionary } from '../i18n/translations';
 import { X, User, Lock, Mail, Sparkles, Crown, Heart, Check } from 'lucide-react';
+import { registerUserApi, loginUserApi } from '../lib/api';
 
 interface AuthModalProps {
   t: TranslationDictionary;
@@ -35,31 +36,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     try {
       if (mode === 'register') {
-        const res = await fetch('/api/auth/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            full_name: fullName,
-            email,
-            password,
-            role,
-          }),
+        const { user } = await registerUserApi({
+          full_name: fullName || email.split('@')[0],
+          email,
+          password,
+          role,
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Kayıt başarısız oldu.');
 
-        onRegisterSuccess(data.user, role);
+        onRegisterSuccess(user, role);
         onClose();
       } else {
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Giriş başarısız oldu.');
+        const { user } = await loginUserApi({ email, password });
 
-        onLoginSuccess(data.user);
+        onLoginSuccess(user);
         onClose();
       }
     } catch (err: any) {

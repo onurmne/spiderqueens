@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Contestant, UserProfile } from '../types';
 import { TranslationDictionary } from '../i18n/translations';
 import { motion, AnimatePresence } from 'motion/react';
@@ -27,6 +27,26 @@ export const VersusClash: React.FC<VersusClashProps> = ({
   const [rightIndex, setRightIndex] = useState(1);
   const [votingId, setVotingId] = useState<string | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  const [activeActivityIndex, setActiveActivityIndex] = useState(0);
+
+  const activities = useMemo(() => {
+    if (approvedList.length === 0) return ['Arena is active and waiting for contestants!'];
+    return [
+      `User_${Math.floor(100 + Math.random() * 800)} cast a Super Vote for ${approvedList[0]?.nickname || 'Cosplayer'}!`,
+      `Gamer_${Math.floor(100 + Math.random() * 800)} voted for ${approvedList[1 % approvedList.length]?.nickname || 'Cosplayer'}!`,
+      `CosplayFan_${Math.floor(10 + Math.random() * 90)} purchased 25 Super Votes in Store!`,
+      `Voter_${Math.floor(100 + Math.random() * 800)} voted for ${approvedList[2 % approvedList.length]?.nickname || 'Cosplayer'}!`,
+      `QueenSupporter_${Math.floor(10 + Math.random() * 90)} boosted ${approvedList[3 % approvedList.length]?.nickname || approvedList[0]?.nickname}!`,
+    ];
+  }, [approvedList]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveActivityIndex((prev) => (prev + 1) % activities.length);
+    }, 3200);
+    return () => clearInterval(timer);
+  }, [activities.length]);
 
   const leftCosplayer = approvedList[leftIndex] || approvedList[0];
   const rightCosplayer = approvedList[rightIndex] || approvedList[1] || approvedList[0];
@@ -371,19 +391,31 @@ export const VersusClash: React.FC<VersusClashProps> = ({
 
       {/* Recent Activities Status Strip */}
       <div className="mt-8 bg-white/5 rounded-2xl border border-white/10 p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-        <div className="flex gap-3 items-center">
-          <span className="font-extrabold text-gray-500 uppercase tracking-widest text-[10px]">RECENT ACTIVITY:</span>
-          <div className="flex -space-x-2">
-            <div className="w-6 h-6 rounded-full bg-pink-600 border-2 border-[#0A0A0C]" />
-            <div className="w-6 h-6 rounded-full bg-blue-600 border-2 border-[#0A0A0C]" />
-            <div className="w-6 h-6 rounded-full bg-purple-600 border-2 border-[#0A0A0C]" />
+        <div className="flex gap-3 items-center overflow-hidden">
+          <span className="font-extrabold text-pink-400 uppercase tracking-widest text-[10px] flex items-center gap-1.5 shrink-0">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            RECENT ACTIVITY:
+          </span>
+          <div className="hidden sm:flex -space-x-2 shrink-0">
+            <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-pink-600 to-purple-600 border-2 border-[#0A0A0C]" />
+            <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 border-2 border-[#0A0A0C]" />
+            <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-amber-500 to-red-600 border-2 border-[#0A0A0C]" />
           </div>
-          <p className="text-gray-300">
-            <b>User_892</b> cast votes for <span className="text-pink-400 font-bold">{leftCosplayer.nickname}</span>!
-          </p>
+          <AnimatePresence mode="wait">
+            <motion.p
+              key={activeActivityIndex}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.25 }}
+              className="text-gray-200 font-semibold truncate"
+            >
+              {activities[activeActivityIndex] || `Live arena active and accepting votes!`}
+            </motion.p>
+          </AnimatePresence>
         </div>
-        <div className="text-pink-500 font-bold animate-pulse flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-pink-500" />
+        <div className="text-pink-500 font-bold shrink-0 flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-pink-500 animate-pulse" />
           <span>Live Arena Active</span>
         </div>
       </div>

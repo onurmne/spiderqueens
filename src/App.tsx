@@ -95,7 +95,20 @@ export default function App() {
     fetchData();
   }, []);
 
+  const isLoggedIn = Boolean(
+    userProfile && 
+    userProfile.email && 
+    userProfile.email.trim() !== '' && 
+    !userProfile.email.includes('guest') && 
+    !userProfile.email.includes('voter@spiderqueens.com')
+  );
+
   const handleVote = async (contestantId: string, isSuperVote: boolean) => {
+    if (!isLoggedIn) {
+      setIsAuthOpen(true);
+      throw new Error('Oy kullanabilmek için lütfen önce giriş yapın veya kayıt olun.');
+    }
+
     const fpHash = getBrowserFingerprint();
     const data = await castVoteApi(contestantId, isSuperVote, fpHash);
 
@@ -294,6 +307,7 @@ export default function App() {
         userProfile={userProfile}
         onLogout={async () => {
           try {
+            localStorage.removeItem('sq_user_session');
             await fetch('/api/auth/logout', { method: 'POST' });
           } catch (e) {
             console.error('Logout error', e);
@@ -322,7 +336,10 @@ export default function App() {
       {/* Footer */}
       <footer className="bg-[#0F0F12] border-t border-white/10 py-5 px-6 text-center text-xs text-gray-500">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+          <div 
+            onClick={() => setActiveTab('clash')} 
+            className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+          >
             <Crown className="w-4 h-4 text-pink-500" />
             <span className="font-black text-gray-200 tracking-tight">SpiderQueens Championship</span>
             <span>© 2026</span>

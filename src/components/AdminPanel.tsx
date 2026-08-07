@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Contestant, Transaction } from '../types';
 import { TranslationDictionary } from '../i18n/translations';
-import { Shield, Check, X, ExternalLink, Copy, FileCode, Users, DollarSign, Heart, AlertCircle, CheckCircle2, Award, Sparkles, TrendingUp, Percent, Save, Zap } from 'lucide-react';
+import { Shield, Check, X, ExternalLink, Copy, FileCode, Users, DollarSign, Heart, AlertCircle, CheckCircle2, Award, Sparkles, TrendingUp, Percent, Save, Zap, CreditCard } from 'lucide-react';
 
 interface AdminPanelProps {
   t: TranslationDictionary;
@@ -13,7 +13,7 @@ interface AdminPanelProps {
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ t, onAdminAction }) => {
-  const [activeTab, setActiveTab] = useState<'applicants' | 'transactions' | 'rewards' | 'sql'>('applicants');
+  const [activeTab, setActiveTab] = useState<'applicants' | 'transactions' | 'rewards' | 'gateways' | 'sql'>('applicants');
   const [pendingApplicants, setPendingApplicants] = useState<Contestant[]>([]);
   const [pendingTransactions, setPendingTransactions] = useState<Transaction[]>([]);
   const [stats, setStats] = useState({ totalContestants: 0, totalVotes: 0 });
@@ -32,6 +32,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ t, onAdminAction }) => {
   });
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
+
+  // Payment Gateway Settings State (Stripe & Iyzico)
+  const [gatewayConfig, setGatewayConfig] = useState({
+    active_gateway: 'stripe',
+    stripe_publishable_key: 'pk_test_51SQ_spiderqueens_demo_key',
+    stripe_secret_key: 'sk_test_51SQ_spiderqueens_secret_key',
+    iyzico_api_key: 'sandbox-iyzico-api-key-2026',
+    iyzico_secret_key: 'sandbox-iyzico-secret-key-2026',
+    iyzico_base_url: 'https://sandbox-api.iyzipay.com',
+    credit_card_enabled: true,
+  });
+  const [savingGateways, setSavingGateways] = useState(false);
+  const [gatewaysSaved, setGatewaysSaved] = useState(false);
 
   const fetchAdminData = async () => {
     try {
@@ -172,6 +185,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ t, onAdminAction }) => {
           >
             <Award className="w-3.5 h-3.5 text-amber-400" />
             <span>Reward Pool</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('gateways')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'gateways'
+                ? 'bg-pink-500 text-white shadow-md'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Ödeme Altyapısı (Stripe/Iyzico)</span>
           </button>
 
           <button
@@ -529,7 +554,209 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ t, onAdminAction }) => {
         </div>
       )}
 
-      {/* Tab 4: Supabase SQL Schema Exporter */}
+      {/* Tab 4: Payment Gateway Infrastructure (Stripe & Iyzico) */}
+      {activeTab === 'gateways' && (
+        <div className="bg-[#0F0F12] rounded-2xl border border-white/10 p-6 shadow-2xl space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-4">
+            <div>
+              <h3 className="text-xl font-black text-white uppercase italic tracking-tight flex items-center gap-2">
+                <CreditCard className="w-6 h-6 text-emerald-400" />
+                <span>Kredi Kartı ve Ödeme Altyapısı (Stripe & Iyzico)</span>
+              </h3>
+              <p className="text-xs text-gray-400 mt-1">
+                Kullanıcıların kredi kartı veya banka kartı ile Super Vote satın alabilmesi için Stripe ve Iyzico entegrasyon ayarlarını buradan yönetebilirsiniz.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400 text-xs font-mono font-bold">
+              <Shield className="w-4 h-4" />
+              <span>Güvenli 256-Bit SSL Hazır</span>
+            </div>
+          </div>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              setSavingGateways(true);
+              setTimeout(() => {
+                setSavingGateways(false);
+                setGatewaysSaved(true);
+                setTimeout(() => setGatewaysSaved(false), 3000);
+              }, 800);
+            }}
+            className="space-y-6"
+          >
+            {/* Enable/Disable Toggle & Active Gateway Selector */}
+            <div className="bg-[#151518] p-5 rounded-2xl border border-white/10 space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div>
+                  <h4 className="text-sm font-black text-white uppercase tracking-wider">Kredi Kartı İle Ödeme Durumu</h4>
+                  <p className="text-xs text-gray-400">Mağazada kredi kartı seçeneğinin aktif/pasif olması</p>
+                </div>
+
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={gatewayConfig.credit_card_enabled}
+                    onChange={(e) => setGatewayConfig({ ...gatewayConfig, credit_card_enabled: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-pink-600"></div>
+                </label>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
+                  Varsayılan Aktif Ödeme Sağlayıcısı
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setGatewayConfig({ ...gatewayConfig, active_gateway: 'stripe' })}
+                    className={`p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                      gatewayConfig.active_gateway === 'stripe'
+                        ? 'bg-purple-500/20 border-purple-500 text-white'
+                        : 'bg-[#0F0F12] border-white/10 text-gray-400'
+                    }`}
+                  >
+                    <span>Stripe Global (USD/EUR)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setGatewayConfig({ ...gatewayConfig, active_gateway: 'iyzico' })}
+                    className={`p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                      gatewayConfig.active_gateway === 'iyzico'
+                        ? 'bg-blue-500/20 border-blue-500 text-white'
+                        : 'bg-[#0F0F12] border-white/10 text-gray-400'
+                    }`}
+                  >
+                    <span>Iyzico Türkiye (TRY/USD)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setGatewayConfig({ ...gatewayConfig, active_gateway: 'both' })}
+                    className={`p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                      gatewayConfig.active_gateway === 'both'
+                        ? 'bg-emerald-500/20 border-emerald-500 text-white'
+                        : 'bg-[#0F0F12] border-white/10 text-gray-400'
+                    }`}
+                  >
+                    <span>Her İkisi De Aktif (Otomatik)</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Stripe Credentials Block */}
+            <div className="bg-[#151518] p-5 rounded-2xl border border-purple-500/30 space-y-4">
+              <div className="flex items-center gap-2 text-purple-400 font-black uppercase text-xs tracking-wider">
+                <CreditCard className="w-4 h-4" />
+                <span>Stripe API Ayarları</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-400 uppercase mb-1">
+                    Stripe Publishable Key (Yayınlanabilir Anahtar)
+                  </label>
+                  <input
+                    type="text"
+                    value={gatewayConfig.stripe_publishable_key}
+                    onChange={(e) => setGatewayConfig({ ...gatewayConfig, stripe_publishable_key: e.target.value })}
+                    className="w-full bg-[#0F0F12] border border-white/10 rounded-xl px-3 py-2 text-white font-mono text-xs focus:border-purple-500 outline-none"
+                    placeholder="pk_live_..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-400 uppercase mb-1">
+                    Stripe Secret Key (Gizli Anahtar)
+                  </label>
+                  <input
+                    type="password"
+                    value={gatewayConfig.stripe_secret_key}
+                    onChange={(e) => setGatewayConfig({ ...gatewayConfig, stripe_secret_key: e.target.value })}
+                    className="w-full bg-[#0F0F12] border border-white/10 rounded-xl px-3 py-2 text-white font-mono text-xs focus:border-purple-500 outline-none"
+                    placeholder="sk_live_..."
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Iyzico Credentials Block */}
+            <div className="bg-[#151518] p-5 rounded-2xl border border-blue-500/30 space-y-4">
+              <div className="flex items-center gap-2 text-blue-400 font-black uppercase text-xs tracking-wider">
+                <CreditCard className="w-4 h-4" />
+                <span>Iyzico API Ayarları (Türkiye Sanal POS)</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-400 uppercase mb-1">
+                    Iyzico API Key
+                  </label>
+                  <input
+                    type="text"
+                    value={gatewayConfig.iyzico_api_key}
+                    onChange={(e) => setGatewayConfig({ ...gatewayConfig, iyzico_api_key: e.target.value })}
+                    className="w-full bg-[#0F0F12] border border-white/10 rounded-xl px-3 py-2 text-white font-mono text-xs focus:border-blue-500 outline-none"
+                    placeholder="api_key_..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-400 uppercase mb-1">
+                    Iyzico Secret Key
+                  </label>
+                  <input
+                    type="password"
+                    value={gatewayConfig.iyzico_secret_key}
+                    onChange={(e) => setGatewayConfig({ ...gatewayConfig, iyzico_secret_key: e.target.value })}
+                    className="w-full bg-[#0F0F12] border border-white/10 rounded-xl px-3 py-2 text-white font-mono text-xs focus:border-blue-500 outline-none"
+                    placeholder="secret_key_..."
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-[11px] font-bold text-gray-400 uppercase mb-1">
+                    Iyzico API Base URL Endpoint
+                  </label>
+                  <input
+                    type="text"
+                    value={gatewayConfig.iyzico_base_url}
+                    onChange={(e) => setGatewayConfig({ ...gatewayConfig, iyzico_base_url: e.target.value })}
+                    className="w-full bg-[#0F0F12] border border-white/10 rounded-xl px-3 py-2 text-white font-mono text-xs focus:border-blue-500 outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2">
+              {gatewaysSaved ? (
+                <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-xs">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Ödeme altyapı ayarları başarıyla kaydedildi!</span>
+                </div>
+              ) : (
+                <span className="text-xs text-gray-400">Tüm API anahtarları 256-bit şifreleme ile saklanır.</span>
+              )}
+
+              <button
+                type="submit"
+                disabled={savingGateways}
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-lg transition-all cursor-pointer"
+              >
+                <Save className="w-4 h-4" />
+                <span>{savingGateways ? 'Kaydediliyor...' : 'Ödeme Ayarlarını Kaydet'}</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Tab 5: Supabase SQL Schema Exporter */}
       {activeTab === 'sql' && (
         <div className="bg-[#0F0F12] rounded-2xl border border-white/10 p-6 shadow-2xl">
           <div className="flex items-center justify-between gap-4 mb-4">

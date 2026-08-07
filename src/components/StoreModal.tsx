@@ -23,7 +23,7 @@ const PACKAGES: SuperVotePackage[] = [
 ];
 
 const WALLETS: Record<CryptoAsset, string> = {
-  USDT_TRC20: 'TSp1derQu33nsUSDT2026M1n1ngW4ll3tAdr3ssTRC20',
+  USDT_TRC20: 'TKZnN4u5L11Da5W8svvV1SnVuQRe6bKaqt',
   BTC: '1Sp1derQu33nsBTC2026S3cur3W4ll3tAdr3ss',
   ETH: '0xSp1derQu33nsETH2026S3cur3W4ll3tAdr3ss',
 };

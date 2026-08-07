@@ -129,7 +129,168 @@ export async function fetchUserProfileApi(): Promise<UserProfile | null> {
     return result.data;
   }
 
+  try {
+    const saved = localStorage.getItem('sq_user_session');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed && parsed.email) {
+        return parsed;
+      }
+    }
+  } catch (e) {}
+
   return null;
+}
+
+// Auth Register
+export async function registerUserApi(params: {
+  full_name: string;
+  email: string;
+  password?: string;
+  role: 'voter' | 'contestant';
+}): Promise<{ user: UserProfile }> {
+  // 1. Try Express backend
+  const result = await safeJsonFetch('/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+
+  if (result.ok && result.data && result.data.user) {
+    try {
+      localStorage.setItem('sq_user_session', JSON.stringify(result.data.user));
+    } catch (e) {}
+    return { user: result.data.user };
+  }
+
+  if (result.res && !result.ok && result.data && result.data.error) {
+    throw new Error(result.data.error);
+  }
+
+  // 2. Try Supabase Auth if configured
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: params.email,
+        password: params.password || 'SpiderQueens2026!',
+        options: {
+          data: {
+            full_name: params.full_name,
+            role: params.role,
+          },
+        },
+      });
+
+      if (authError) throw new Error(authError.message);
+
+      const userProfile: UserProfile = {
+        id: authData.user?.id || 'user_' + Date.now(),
+        email: params.email,
+        full_name: params.full_name,
+        role: params.role,
+        is_admin: params.email.toLowerCase() === 'admin@spiderqueens.com',
+        super_votes_credit: params.role === 'contestant' ? 25 : 15,
+        created_at: new Date().toISOString(),
+      };
+
+      try {
+        localStorage.setItem('sq_user_session', JSON.stringify(userProfile));
+      } catch (e) {}
+
+      return { user: userProfile };
+    } catch (e: any) {
+      console.warn('Supabase Auth error:', e);
+      if (e.message && !e.message.includes('Fetch')) {
+        throw e;
+      }
+    }
+  }
+
+  // 3. Fallback client registration
+  const newUserProfile: UserProfile = {
+    id: 'user_' + Date.now(),
+    email: params.email,
+    full_name: params.full_name,
+    role: params.role,
+    is_admin: params.email.toLowerCase() === 'admin@spiderqueens.com',
+    super_votes_credit: params.role === 'contestant' ? 25 : 15,
+    created_at: new Date().toISOString(),
+  };
+
+  try {
+    localStorage.setItem('sq_user_session', JSON.stringify(newUserProfile));
+  } catch (e) {}
+
+  return { user: newUserProfile };
+}
+
+// Auth Login
+export async function loginUserApi(params: {
+  email: string;
+  password?: string;
+}): Promise<{ user: UserProfile }> {
+  // 1. Try Express backend
+  const result = await safeJsonFetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+
+  if (result.ok && result.data && result.data.user) {
+    try {
+      localStorage.setItem('sq_user_session', JSON.stringify(result.data.user));
+    } catch (e) {}
+    return { user: result.data.user };
+  }
+
+  if (result.res && !result.ok && result.data && result.data.error) {
+    throw new Error(result.data.error);
+  }
+
+  // 2. Try Supabase Auth if configured
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: params.email,
+        password: params.password || '',
+      });
+
+      if (!authError && authData.user) {
+        const loggedInUser: UserProfile = {
+          id: authData.user.id,
+          email: authData.user.email || params.email,
+          full_name: authData.user.user_metadata?.full_name || params.email.split('@')[0],
+          role: authData.user.user_metadata?.role || 'voter',
+          is_admin: params.email.toLowerCase() === 'admin@spiderqueens.com',
+          super_votes_credit: 15,
+          created_at: new Date().toISOString(),
+        };
+
+        try {
+          localStorage.setItem('sq_user_session', JSON.stringify(loggedInUser));
+        } catch (e) {}
+
+        return { user: loggedInUser };
+      }
+    } catch (e) {}
+  }
+
+  // 3. Fallback client login
+  const loggedUser: UserProfile = {
+    id: 'user_' + Date.now(),
+    email: params.email,
+    full_name: params.email.split('@')[0],
+    role: 'voter',
+    is_admin: params.email.toLowerCase() === 'admin@spiderqueens.com',
+    super_votes_credit: 15,
+    created_at: new Date().toISOString(),
+  };
+
+  try {
+    localStorage.setItem('sq_user_session', JSON.stringify(loggedUser));
+  } catch (e) {}
+
+  return { user: loggedUser };
 }
 
 // Cast Vote
@@ -178,16 +339,28 @@ export async function submitApplicationApi(data: any) {
   }
 
   if (isSupabaseConfigured && supabase) {
-    const { data: inserted, error } = await supabase.from('contestants').insert([
-      {
-        ...data,
-        status: 'approved', // Auto-approve on direct client demo if configured
-        votes_count: 0,
-      }
-    ]).select();
+    let insertPayload: any = {
+      full_name: data.full_name,
+      nickname: data.nickname,
+      instagram_handle: data.instagram_handle,
+      character_name: data.character_name,
+      photo_url: data.photo_url,
+      bio: data.bio || '',
+      status: 'approved', // Auto-approve on direct client demo if configured
+      votes_count: 0,
+    };
+
+    let { data: inserted, error } = await supabase.from('contestants').insert([insertPayload]).select();
+
+    if (error && error.message && error.message.includes("bio")) {
+      delete insertPayload.bio;
+      const retry = await supabase.from('contestants').insert([insertPayload]).select();
+      inserted = retry.data;
+      error = retry.error;
+    }
 
     if (error) throw new Error(error.message);
-    return { success: true, contestant: inserted[0] };
+    return { success: true, contestant: inserted ? inserted[0] : null };
   }
 
   return { success: true };

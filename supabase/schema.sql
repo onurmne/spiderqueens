@@ -25,10 +25,14 @@ CREATE TABLE IF NOT EXISTS public.contestants (
   instagram_handle TEXT NOT NULL,
   character_name TEXT,
   photo_url TEXT NOT NULL,
+  bio TEXT,
   status TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'rejected')) DEFAULT 'pending',
   votes_count INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Ensure bio column exists on existing installations
+ALTER TABLE public.contestants ADD COLUMN IF NOT EXISTS bio TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_contestants_status_votes ON public.contestants(status, votes_count DESC);
 CREATE INDEX IF NOT EXISTS idx_contestants_user ON public.contestants(user_id);
