@@ -37,21 +37,21 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   }, []);
 
   return (
-    <div className="relative inline-block text-left" ref={dropdownRef}>
+    <div className="relative inline-block text-left shrink-0" ref={dropdownRef}>
       <button
         type="button"
         id="language-selector-button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1 sm:gap-1.5 px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-pink-500/50 text-white text-xs font-semibold transition-all shadow-sm cursor-pointer"
+        className="flex items-center gap-1 px-1.5 py-1 sm:px-2.5 sm:py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-pink-500/50 text-white text-xs font-semibold transition-all shadow-sm cursor-pointer"
       >
-        <span className="text-sm sm:text-base">{selectedLanguage.flag}</span>
-        <span className="hidden lg:inline-block text-xs">{selectedLanguage.nativeName}</span>
-        <span className="uppercase text-[10px] sm:text-xs text-pink-400 font-bold">{selectedLanguage.code}</span>
+        <span className="text-sm">{selectedLanguage.flag}</span>
+        <span className="hidden md:inline-block text-xs">{selectedLanguage.nativeName}</span>
+        <span className="uppercase text-[10px] sm:text-xs text-pink-400 font-extrabold">{selectedLanguage.code}</span>
         <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-48 rounded-2xl bg-[#0F0F12] border border-pink-500/50 shadow-[0_20px_50px_rgba(0,0,0,0.95)] backdrop-blur-2xl z-[99999] overflow-hidden max-w-[calc(100vw-24px)] animate-in fade-in slide-in-from-top-2 duration-150">
+        <div className="absolute right-0 top-full mt-2 w-44 sm:w-48 rounded-2xl bg-[#0F0F12] border border-pink-500/50 shadow-[0_20px_50px_rgba(0,0,0,0.95)] backdrop-blur-2xl z-[99999] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150 max-w-[calc(100vw-32px)]">
           <div className="py-1.5 max-h-[60vh] overflow-y-auto">
             {LANGUAGES.map((lang) => {
               const isSelected = lang.code === currentLang;
@@ -63,17 +63,17 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
                     onSelectLang(lang.code);
                     setIsOpen(false);
                   }}
-                  className={`w-full text-left px-4 py-2.5 text-xs sm:text-sm flex items-center justify-between transition-colors cursor-pointer ${
+                  className={`w-full text-left px-3.5 py-2 text-xs sm:text-sm flex items-center justify-between transition-colors cursor-pointer ${
                     isSelected
                       ? 'bg-gradient-to-r from-pink-500/20 to-purple-500/20 text-pink-300 font-bold border-l-2 border-pink-500'
                       : 'text-gray-300 hover:bg-white/10 hover:text-white'
                   }`}
                 >
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-base sm:text-lg">{lang.flag}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">{lang.flag}</span>
                     <span>{lang.nativeName}</span>
                   </div>
-                  {isSelected && <Check className="w-4 h-4 text-pink-400" />}
+                  {isSelected && <Check className="w-3.5 h-3.5 text-pink-400" />}
                 </button>
               );
             })}

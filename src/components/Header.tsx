@@ -142,14 +142,14 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               id="btn-user-auth-profile"
               onClick={isLoggedIn ? onOpenProfile : onOpenAuth}
-              className={`px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl border text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`px-2 sm:px-3.5 py-1.5 sm:py-2 rounded-xl border text-xs font-extrabold transition-all flex items-center gap-1 sm:gap-1.5 cursor-pointer max-w-[110px] sm:max-w-none ${
                 isLoggedIn
                   ? 'bg-pink-500/10 border-pink-500/30 text-pink-300 hover:bg-pink-500/20'
                   : 'bg-gradient-to-r from-pink-600 to-purple-600 hover:brightness-110 border-pink-500/40 text-white shadow-md'
               }`}
             >
-              <UserCheck className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isLoggedIn ? 'text-pink-400' : 'text-white'}`} />
-              <span className="text-[11px] sm:text-xs">
+              <UserCheck className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 ${isLoggedIn ? 'text-pink-400' : 'text-white'}`} />
+              <span className="text-[11px] sm:text-xs truncate">
                 {isLoggedIn
                   ? userProfile.full_name || userProfile.email.split('@')[0]
                   : t.loginRegisterBtn}

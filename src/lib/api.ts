@@ -183,7 +183,12 @@ export async function registerUserApi(params: {
         },
       });
 
-      if (authError) throw new Error(authError.message);
+      if (authError) {
+        if (authError.message.includes('already registered') || authError.message.includes('User already exists')) {
+          throw new Error('Bu e-posta adresi ile zaten bir hesap oluşturulmuş. Lütfen giriş yapın.');
+        }
+        throw new Error(authError.message);
+      }
 
       const requiresConfirmation = Boolean(authData.user && !authData.session);
 
@@ -197,6 +202,24 @@ export async function registerUserApi(params: {
         created_at: new Date().toISOString(),
       };
 
+      // Also upsert into public.profiles in Supabase directly
+      if (authData.user?.id) {
+        try {
+          await supabase.from('profiles').upsert([
+            {
+              id: authData.user.id,
+              email: params.email,
+              full_name: params.full_name,
+              role: params.role,
+              is_admin: params.email.toLowerCase() === 'admin@spiderqueens.com',
+              super_votes_credit: 0,
+            }
+          ]);
+        } catch (err) {
+          console.warn('Profiles upsert warning:', err);
+        }
+      }
+
       try {
         localStorage.setItem('sq_user_session', JSON.stringify(userProfile));
       } catch (e) {}
@@ -204,9 +227,7 @@ export async function registerUserApi(params: {
       return { user: userProfile, requiresConfirmation };
     } catch (e: any) {
       console.warn('Supabase Auth error:', e);
-      if (e.message && !e.message.includes('Fetch')) {
-        throw e;
-      }
+      if (e.message) throw e;
     }
   }
 
@@ -259,15 +280,26 @@ export async function loginUserApi(params: {
         password: params.password || '',
       });
 
-      if (!authError && authData.user) {
+      if (authError) {
+        throw new Error('E-posta veya şifre hatalı. Lütfen bilgilerinizi kontrol edin.');
+      }
+
+      if (authData.user) {
+        // Retrieve profile details from public.profiles
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', authData.user.id)
+          .maybeSingle();
+
         const loggedInUser: UserProfile = {
           id: authData.user.id,
           email: authData.user.email || params.email,
-          full_name: authData.user.user_metadata?.full_name || params.email.split('@')[0],
-          role: authData.user.user_metadata?.role || 'voter',
-          is_admin: params.email.toLowerCase() === 'admin@spiderqueens.com',
-          super_votes_credit: 0,
-          created_at: new Date().toISOString(),
+          full_name: prof?.full_name || authData.user.user_metadata?.full_name || params.email.split('@')[0],
+          role: prof?.role || authData.user.user_metadata?.role || 'voter',
+          is_admin: prof?.is_admin ?? (params.email.toLowerCase() === 'admin@spiderqueens.com'),
+          super_votes_credit: prof?.super_votes_credit ?? 0,
+          created_at: prof?.created_at || new Date().toISOString(),
         };
 
         try {
@@ -276,7 +308,9 @@ export async function loginUserApi(params: {
 
         return { user: loggedInUser };
       }
-    } catch (e) {}
+    } catch (e: any) {
+      if (e.message) throw e;
+    }
   }
 
   // 3. Fallback client login
@@ -313,12 +347,46 @@ export async function castVoteApi(contestantId: string, isSuperVote: boolean, fi
     return result.data;
   }
 
-  // Client-side simulation if server is offline (e.g. static Vercel build without backend)
+  // Direct Supabase execution if Express API is unavailable (e.g. Vercel static host)
   if (isSupabaseConfigured && supabase) {
     try {
-      await supabase.rpc('increment_contestant_vote_count', { contestant_id: contestantId });
+      const voteVal = isSuperVote ? 5 : 1;
+      
+      // Step A: Insert record into votes table
+      const { error: insertErr } = await supabase.from('votes').insert([
+        {
+          contestant_id: contestantId,
+          is_super_vote: isSuperVote,
+          voter_ip: 'client_app',
+          fingerprint_hash: fingerprintHash || 'sqfp_default',
+        }
+      ]);
+
+      // Step B: If insert fails or trigger didn't run, execute increment_vote_count RPC
+      if (insertErr) {
+        const { error: rpcErr } = await supabase.rpc('increment_vote_count', {
+          contestant_id: contestantId,
+          is_super: isSuperVote
+        });
+
+        // Step C: Fallback to direct update if RPC is missing
+        if (rpcErr) {
+          const { data: currentContestant } = await supabase
+            .from('contestants')
+            .select('votes_count')
+            .eq('id', contestantId)
+            .single();
+
+          if (currentContestant) {
+            await supabase
+              .from('contestants')
+              .update({ votes_count: (currentContestant.votes_count || 0) + voteVal })
+              .eq('id', contestantId);
+          }
+        }
+      }
     } catch (e) {
-      console.warn('Supabase vote RPC error', e);
+      console.warn('Supabase vote recording error:', e);
     }
   }
 
@@ -343,6 +411,13 @@ export async function submitApplicationApi(data: any) {
   }
 
   if (isSupabaseConfigured && supabase) {
+    // Check logged in user ID if available
+    let currentUserId: string | null = null;
+    try {
+      const authUser = (await supabase.auth.getUser()).data.user;
+      if (authUser?.id) currentUserId = authUser.id;
+    } catch (e) {}
+
     let insertPayload: any = {
       full_name: data.full_name,
       nickname: data.nickname,
@@ -350,9 +425,13 @@ export async function submitApplicationApi(data: any) {
       character_name: data.character_name,
       photo_url: data.photo_url,
       bio: data.bio || '',
-      status: 'approved', // Auto-approve on direct client demo if configured
+      status: 'approved',
       votes_count: 0,
     };
+
+    if (currentUserId) {
+      insertPayload.user_id = currentUserId;
+    }
 
     let { data: inserted, error } = await supabase.from('contestants').insert([insertPayload]).select();
 
@@ -363,7 +442,11 @@ export async function submitApplicationApi(data: any) {
       error = retry.error;
     }
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.error("Contestant insert error:", error);
+      throw new Error("Yarışma başvurusu kaydedilemedi: " + error.message);
+    }
+
     return { success: true, contestant: inserted ? inserted[0] : null };
   }
 
