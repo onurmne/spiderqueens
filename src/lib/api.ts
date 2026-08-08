@@ -911,3 +911,126 @@ export async function fetchAdminPendingApi(): Promise<{
 
   return { pendingApplicants: [], pendingTransactions: [], totalContestants: 0, totalVotes: 0 };
 }
+
+// ---------- Reward Settings (live prize pool) ----------
+export type RewardSettings = {
+  pool_contribution_percentage: number;
+  base_first_prize: number;
+  base_second_prize: number;
+  base_third_prize: number;
+  accumulated_pool_usd: number;
+  first_place_prize_usd: number;
+};
+
+export const DEFAULT_REWARD_SETTINGS: RewardSettings = {
+  pool_contribution_percentage: 20,
+  base_first_prize: 1000,
+  base_second_prize: 250,
+  base_third_prize: 50,
+  accumulated_pool_usd: 0,
+  first_place_prize_usd: 1000,
+};
+
+export function formatPrizeUsd(amount: number): string {
+  const n = Number(amount) || 0;
+  return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+}
+
+export async function fetchSettingsApi(): Promise<RewardSettings> {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('settings')
+        .select('*')
+        .eq('id', 1)
+        .maybeSingle();
+      if (!error && data) {
+        const base1 = Number(data.base_first_prize) || 1000;
+        const pool = Number(data.accumulated_pool_usd) || 0;
+        return {
+          pool_contribution_percentage: Number(data.pool_contribution_percentage) || 20,
+          base_first_prize: base1,
+          base_second_prize: Number(data.base_second_prize) || 250,
+          base_third_prize: Number(data.base_third_prize) || 50,
+          accumulated_pool_usd: pool,
+          first_place_prize_usd: base1 + pool,
+        };
+      }
+    } catch (e) {
+      console.warn('fetchSettingsApi:', e);
+    }
+  }
+
+  const result = await safeJsonFetch('/api/settings');
+  if (result.ok && result.data) {
+    const d = result.data;
+    const base1 = Number(d.base_first_prize) || 1000;
+    const pool = Number(d.accumulated_pool_usd) || 0;
+    return {
+      pool_contribution_percentage: Number(d.pool_contribution_percentage) || 20,
+      base_first_prize: base1,
+      base_second_prize: Number(d.base_second_prize) || 250,
+      base_third_prize: Number(d.base_third_prize) || 50,
+      accumulated_pool_usd: pool,
+      first_place_prize_usd: Number(d.first_place_prize_usd) || base1 + pool,
+    };
+  }
+
+  return { ...DEFAULT_REWARD_SETTINGS };
+}
+
+export async function saveSettingsApi(input: {
+  pool_contribution_percentage: number;
+  base_first_prize: number;
+  base_second_prize: number;
+  base_third_prize: number;
+}): Promise<RewardSettings> {
+  if (isSupabaseConfigured && supabase) {
+    const payload = {
+      id: 1,
+      pool_contribution_percentage: input.pool_contribution_percentage,
+      base_first_prize: input.base_first_prize,
+      base_second_prize: input.base_second_prize,
+      base_third_prize: input.base_third_prize,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data, error } = await supabase
+      .from('settings')
+      .upsert([payload])
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      console.warn('saveSettingsApi:', error);
+      throw new Error('Ödül ayarları kaydedilemedi: ' + error.message);
+    }
+
+    const base1 = Number(data?.base_first_prize ?? input.base_first_prize);
+    const pool = Number(data?.accumulated_pool_usd ?? 0);
+    return {
+      pool_contribution_percentage: Number(data?.pool_contribution_percentage ?? input.pool_contribution_percentage),
+      base_first_prize: base1,
+      base_second_prize: Number(data?.base_second_prize ?? input.base_second_prize),
+      base_third_prize: Number(data?.base_third_prize ?? input.base_third_prize),
+      accumulated_pool_usd: pool,
+      first_place_prize_usd: base1 + pool,
+    };
+  }
+
+  const result = await safeJsonFetch('/api/admin/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (result.ok && result.data?.settings) {
+    return result.data.settings as RewardSettings;
+  }
+
+  return {
+    ...DEFAULT_REWARD_SETTINGS,
+    ...input,
+    accumulated_pool_usd: 0,
+    first_place_prize_usd: input.base_first_prize,
+  };
+}
