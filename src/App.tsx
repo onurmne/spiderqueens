@@ -19,7 +19,10 @@ import {
   castVoteApi, 
   submitApplicationApi, 
   createTransactionApi, 
-  adminActionApi 
+  adminActionApi,
+  fetchSettingsApi,
+  DEFAULT_REWARD_SETTINGS,
+  type RewardSettings,
 } from './lib/api';
 import { Heart, Trophy, Crown, Sparkles, Shield, Lock, ArrowRight } from 'lucide-react';
 
@@ -47,6 +50,7 @@ export default function App() {
   const [isAdminUnlocked, setIsAdminUnlocked] = useState<boolean>(false);
   const [adminError, setAdminError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
+  const [rewardSettings, setRewardSettings] = useState<RewardSettings>(DEFAULT_REWARD_SETTINGS);
 
   const t = translations[currentLang] || translations.tr;
 
@@ -72,6 +76,11 @@ export default function App() {
       if (Array.isArray(contestantsList) && contestantsList.length > 0) {
         setContestants(contestantsList);
       }
+
+      try {
+        const settingsData = await fetchSettingsApi();
+        if (settingsData) setRewardSettings(settingsData);
+      } catch (e) {}
 
       const profileData = await fetchUserProfileApi();
       if (profileData && profileData.email && profileData.email.trim() !== '') {
@@ -210,6 +219,7 @@ export default function App() {
         onOpenStore={() => setIsStoreOpen(true)}
         onOpenAuth={() => setIsAuthOpen(true)}
         onOpenProfile={() => setIsProfileOpen(true)}
+        rewardSettings={rewardSettings}
       />
 
       {/* Main Content Area */}
@@ -228,6 +238,7 @@ export default function App() {
                 userProfile={userProfile}
                 onVote={handleVote}
                 onOpenStore={() => setIsStoreOpen(true)}
+                rewardSettings={rewardSettings}
               />
             )}
 
@@ -251,7 +262,11 @@ export default function App() {
             {/* Hidden Admin Access Route (/admin) */}
             {activeTab === 'admin' && (
               isAdminUnlocked || userProfile.is_admin ? (
-                <AdminPanel t={t} onAdminAction={handleAdminAction} />
+                <AdminPanel
+                  t={t}
+                  onAdminAction={handleAdminAction}
+                  onSettingsSaved={(s) => setRewardSettings(s)}
+                />
               ) : (
                 <div className="max-w-md mx-auto px-4 py-20 text-center">
                   <div className="bg-[#0F0F12] border border-amber-500/30 rounded-3xl p-8 shadow-2xl">
