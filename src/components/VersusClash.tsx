@@ -3,6 +3,7 @@ import { Contestant, UserProfile } from '../types';
 import { TranslationDictionary } from '../i18n/translations';
 import { motion, AnimatePresence } from 'motion/react';
 import { Heart, Zap, RefreshCw, Instagram, Sparkles, AlertCircle, ShieldAlert, CheckCircle2, Trophy, Gift, DollarSign, Award } from 'lucide-react';
+import { RewardSettings, formatPrizeUsd, DEFAULT_REWARD_SETTINGS } from '../lib/api';
 
 interface VersusClashProps {
   t: TranslationDictionary;
@@ -11,6 +12,7 @@ interface VersusClashProps {
   userProfile: UserProfile;
   onVote: (contestantId: string, isSuperVote: boolean) => Promise<void>;
   onOpenStore: () => void;
+  rewardSettings?: RewardSettings;
 }
 
 export const VersusClash: React.FC<VersusClashProps> = ({
@@ -20,6 +22,7 @@ export const VersusClash: React.FC<VersusClashProps> = ({
   userProfile,
   onVote,
   onOpenStore,
+  rewardSettings = DEFAULT_REWARD_SETTINGS,
 }) => {
   const approvedList = contestants.filter((c) => c.status === 'approved');
 
@@ -338,7 +341,12 @@ export const VersusClash: React.FC<VersusClashProps> = ({
                 <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
               </div>
               <h4 className="text-lg font-black text-white italic">
-                $1,250 {t.prizePool}
+                {formatPrizeUsd(
+                  (rewardSettings.first_place_prize_usd || rewardSettings.base_first_prize) +
+                  rewardSettings.base_second_prize +
+                  rewardSettings.base_third_prize
+                )}{' '}
+                {t.prizePool}
               </h4>
             </div>
           </div>
@@ -353,7 +361,9 @@ export const VersusClash: React.FC<VersusClashProps> = ({
                 <span className="text-[10px] text-gray-400 font-bold uppercase block">#1 Place</span>
                 <span className="text-xs font-black text-amber-400 flex items-center gap-1">
                   <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>{t.firstPlacePrize}</span>
+                  <span>
+                    {formatPrizeUsd(rewardSettings.first_place_prize_usd || rewardSettings.base_first_prize)} NAKİT ÖDÜL (1. Sıra)
+                  </span>
                 </span>
               </div>
             </div>
@@ -367,7 +377,9 @@ export const VersusClash: React.FC<VersusClashProps> = ({
                 <span className="text-[10px] text-gray-400 font-bold uppercase block">#2 Place</span>
                 <span className="text-xs font-black text-gray-200 flex items-center gap-1">
                   <Gift className="w-3.5 h-3.5 text-pink-400" />
-                  <span>{t.secondPlacePrize}</span>
+                  <span>
+                    {formatPrizeUsd(rewardSettings.base_second_prize)} HEDİYE ÇEKİ (2. Sıra)
+                  </span>
                 </span>
               </div>
             </div>
@@ -381,7 +393,9 @@ export const VersusClash: React.FC<VersusClashProps> = ({
                 <span className="text-[10px] text-gray-400 font-bold uppercase block">#3 Place</span>
                 <span className="text-xs font-black text-amber-300 flex items-center gap-1">
                   <Award className="w-3.5 h-3.5 text-amber-400" />
-                  <span>{t.thirdPlacePrize}</span>
+                  <span>
+                    {formatPrizeUsd(rewardSettings.base_third_prize)} HEDİYE ÇEKİ (3. Sıra)
+                  </span>
                 </span>
               </div>
             </div>
