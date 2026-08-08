@@ -3,6 +3,7 @@ import { TranslationDictionary } from '../i18n/translations';
 import { Language, UserProfile } from '../types';
 import { LanguageSelector } from './LanguageSelector';
 import { CountdownTimer } from './CountdownTimer';
+import { RewardSettings, DEFAULT_REWARD_SETTINGS } from '../lib/api';
 import { Crown, Zap, Shield, Sparkles, ShoppingBag, PlusCircle, UserCheck } from 'lucide-react';
 
 interface HeaderProps {
@@ -15,6 +16,7 @@ interface HeaderProps {
   onOpenStore: () => void;
   onOpenAuth: () => void;
   onOpenProfile: () => void;
+  rewardSettings?: RewardSettings;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -27,6 +29,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenStore,
   onOpenAuth,
   onOpenProfile,
+  rewardSettings = DEFAULT_REWARD_SETTINGS,
 }) => {
   const isLoggedIn = Boolean(
     userProfile && 
@@ -39,7 +42,7 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="sticky top-0 z-50 bg-[#0F0F12]/95 backdrop-blur-md border-b border-white/10 shadow-2xl w-full">
       {/* Countdown Timer Strip */}
-      <CountdownTimer t={t} />
+      <CountdownTimer t={t} rewardSettings={rewardSettings} />
 
       {/* Main Header Container */}
       <div className="max-w-7xl mx-auto px-2.5 sm:px-6 py-2.5 sm:py-3">
