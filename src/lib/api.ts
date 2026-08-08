@@ -598,7 +598,7 @@ export async function submitApplicationApi(data: any) {
       character_name: data.character_name || null,
       photo_url: data.photo_url,
       bio: data.bio || '',
-      status: 'approved',
+      status: 'pending', // admin onay kuyrugu
       votes_count: 0,
     };
 
@@ -801,6 +801,68 @@ export async function adminActionApi(params: {
   id: string;
   action: 'approve' | 'reject';
 }) {
+  // Supabase first (Vercel has no /api/admin/action)
+  if (isSupabaseConfigured && supabase) {
+    try {
+      if (params.type === 'contestant') {
+        const newStatus = params.action === 'approve' ? 'approved' : 'rejected';
+        const { error } = await supabase
+          .from('contestants')
+          .update({ status: newStatus })
+          .eq('id', params.id);
+        if (error) throw new Error(error.message);
+        return { success: true, status: newStatus };
+      }
+
+      if (params.type === 'transaction') {
+        if (params.action === 'approve') {
+          // Prefer RPC if exists; else manual update + credit
+          const { error: rpcErr } = await supabase.rpc('approve_transaction_and_credit', {
+            target_transaction_id: params.id,
+          });
+          if (rpcErr) {
+            const { data: tx, error: txErr } = await supabase
+              .from('transactions')
+              .select('*')
+              .eq('id', params.id)
+              .maybeSingle();
+            if (txErr || !tx) throw new Error(txErr?.message || 'Transaction not found');
+
+            await supabase
+              .from('transactions')
+              .update({ status: 'approved' })
+              .eq('id', params.id);
+
+            if (tx.user_id && isValidUuid(tx.user_id)) {
+              const { data: prof } = await supabase
+                .from('profiles')
+                .select('super_votes_credit')
+                .eq('id', tx.user_id)
+                .maybeSingle();
+              const next = (prof?.super_votes_credit || 0) + (tx.super_votes_amount || 0);
+              await supabase
+                .from('profiles')
+                .update({ super_votes_credit: next })
+                .eq('id', tx.user_id);
+              return { success: true, super_votes_credit: next };
+            }
+          }
+          return { success: true };
+        }
+
+        const { error } = await supabase
+          .from('transactions')
+          .update({ status: 'rejected' })
+          .eq('id', params.id);
+        if (error) throw new Error(error.message);
+        return { success: true };
+      }
+    } catch (e: any) {
+      console.warn('adminAction Supabase error:', e);
+      throw e;
+    }
+  }
+
   const result = await safeJsonFetch('/api/admin/action', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -812,4 +874,40 @@ export async function adminActionApi(params: {
   }
 
   return { success: true };
+}
+
+/** Admin: pending applicants + transactions from Supabase (live) */
+export async function fetchAdminPendingApi(): Promise<{
+  pendingApplicants: Contestant[];
+  pendingTransactions: Transaction[];
+  totalContestants: number;
+  totalVotes: number;
+}> {
+  if (isSupabaseConfigured && supabase) {
+    const [apps, txs, allApproved] = await Promise.all([
+      supabase.from('contestants').select('*').eq('status', 'pending').order('created_at', { ascending: false }),
+      supabase.from('transactions').select('*').eq('status', 'pending').order('created_at', { ascending: false }),
+      supabase.from('contestants').select('id, votes_count').eq('status', 'approved'),
+    ]);
+
+    const approved = allApproved.data || [];
+    return {
+      pendingApplicants: (apps.data || []) as Contestant[],
+      pendingTransactions: (txs.data || []) as Transaction[],
+      totalContestants: approved.length,
+      totalVotes: approved.reduce((sum, c: any) => sum + (c.votes_count || 0), 0),
+    };
+  }
+
+  const result = await safeJsonFetch('/api/admin/pending');
+  if (result.ok && result.data) {
+    return {
+      pendingApplicants: result.data.pendingApplicants || [],
+      pendingTransactions: result.data.pendingTransactions || [],
+      totalContestants: result.data.totalContestants || 0,
+      totalVotes: result.data.totalVotes || 0,
+    };
+  }
+
+  return { pendingApplicants: [], pendingTransactions: [], totalContestants: 0, totalVotes: 0 };
 }
