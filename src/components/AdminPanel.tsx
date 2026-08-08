@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Contestant, Transaction } from '../types';
 import { TranslationDictionary } from '../i18n/translations';
 import { Shield, Check, X, ExternalLink, Copy, FileCode, Users, DollarSign, Heart, AlertCircle, CheckCircle2, Award, Sparkles, TrendingUp, Percent, Save, Zap, CreditCard } from 'lucide-react';
+import { fetchAdminPendingApi } from '../lib/api';
 
 interface AdminPanelProps {
   t: TranslationDictionary;
@@ -48,17 +49,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ t, onAdminAction }) => {
 
   const fetchAdminData = async () => {
     try {
-      const res = await fetch('/api/admin/pending');
-      const contentType = res.headers.get('content-type');
-      if (res.ok && contentType && contentType.includes('application/json')) {
-        const data = await res.json();
-        setPendingApplicants(data.pendingApplicants || []);
-        setPendingTransactions(data.pendingTransactions || []);
-        setStats({
-          totalContestants: data.totalContestants || 0,
-          totalVotes: data.totalVotes || 0,
-        });
-      }
+      // Live: Supabase pending queue (Vercel has no /api/admin/pending)
+      const data = await fetchAdminPendingApi();
+      setPendingApplicants(data.pendingApplicants || []);
+      setPendingTransactions(data.pendingTransactions || []);
+      setStats({
+        totalContestants: data.totalContestants || 0,
+        totalVotes: data.totalVotes || 0,
+      });
 
       const schemaRes = await fetch('/api/schema.sql');
       const schemaContentType = schemaRes.headers.get('content-type');
