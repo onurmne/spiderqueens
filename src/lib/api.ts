@@ -4,8 +4,27 @@ import { supabase, isSupabaseConfigured } from './supabaseClient';
 /** Test / owner email: unlimited free votes, auto admin, smooth registration testing */
 export const UNLIMITED_TEST_EMAIL = 'onurmne@gmail.com';
 
+/** Production'da VITE_ENABLE_TEST_BYPASS=true olmadıkça test bypass KAPALI */
+export function isTestBypassEnabled(): boolean {
+  try {
+    return String((import.meta as any).env?.VITE_ENABLE_TEST_BYPASS || '') === 'true';
+  } catch {
+    return false;
+  }
+}
+
+/** Anlık (sahte) kredi kartı onayı — sadece test. Canlıda false bırak. */
+export function isInstantCreditEnabled(): boolean {
+  try {
+    return String((import.meta as any).env?.VITE_ALLOW_INSTANT_CREDIT || '') === 'true';
+  } catch {
+    return false;
+  }
+}
+
 export function isUnlimitedTestEmail(email?: string | null): boolean {
   if (!email) return false;
+  if (!isTestBypassEnabled()) return false;
   return email.trim().toLowerCase() === UNLIMITED_TEST_EMAIL.toLowerCase();
 }
 
@@ -457,6 +476,48 @@ export async function castVoteApi(contestantId: string, isSuperVote: boolean, fi
 
   // Prefer Supabase on live (Vercel has no /api/vote → 404/405 noise)
   if (isSupabaseConfigured && supabase) {
+    // Production: secure RPC (limits + credit consume in DB)
+    try {
+      const { data: secureData, error: secureErr } = await supabase.rpc('cast_vote_secure', {
+        p_contestant_id: contestantId,
+        p_is_super: isSuperVote,
+        p_fingerprint: fingerprintHash || 'sqfp_default',
+        p_voter_ip: unlimited ? 'test_unlimited' : 'client_app',
+      });
+      if (!secureErr && secureData) {
+        const d = secureData as any;
+        if (isSuperVote && typeof d.super_votes_remaining === 'number') {
+          try {
+            const raw = localStorage.getItem('sq_user_session');
+            if (raw) {
+              const sess = JSON.parse(raw);
+              sess.super_votes_credit = d.super_votes_remaining;
+              localStorage.setItem('sq_user_session', JSON.stringify(sess));
+            }
+          } catch (_) {}
+        }
+        return {
+          success: true,
+          is_super_vote: Boolean(d.is_super_vote ?? isSuperVote),
+          votes_added: d.votes_added ?? voteVal,
+          free_votes_remaining: unlimited ? 9999 : (d.free_votes_remaining ?? 4),
+          super_votes_remaining:
+            typeof d.super_votes_remaining === 'number'
+              ? d.super_votes_remaining
+              : currentSuperCredit,
+        };
+      }
+      if (secureErr) {
+        const msg = String(secureErr.message || '');
+        if (msg.includes('limit_reached')) throw new Error('ip_limit_reached');
+        if (msg.includes('self_vote_forbidden')) throw new Error('self_vote_forbidden');
+        if (msg.includes('insufficient_super_votes')) throw new Error('insufficient_super_votes');
+        console.warn('cast_vote_secure fallback:', secureErr.message);
+      }
+    } catch (e: any) {
+      if (['ip_limit_reached', 'self_vote_forbidden', 'insufficient_super_votes'].includes(e?.message)) throw e;
+    }
+
     try {
       if (isSuperVote && !unlimited && currentSuperCredit < 1) {
         throw new Error('insufficient_super_votes');
@@ -726,8 +787,10 @@ export async function createTransactionApi(params: {
       }
 
       const isCreditCard = params.payment_method === 'credit_card';
-      const status = isCreditCard ? 'approved' : 'pending';
-      const newCredit = isCreditCard
+      // Canlıda anlık onay KAPALI (VITE_ALLOW_INSTANT_CREDIT=true ile test)
+      const instantOk = isCreditCard && isInstantCreditEnabled();
+      const status = instantOk ? 'approved' : 'pending';
+      const newCredit = instantOk
         ? currentCredit + params.super_votes_amount
         : currentCredit;
 
@@ -748,13 +811,42 @@ export async function createTransactionApi(params: {
         throw new Error('İşlem kaydedilemedi: ' + txErr.message);
       }
 
-      if (isCreditCard) {
-        const { error: credErr } = await supabase
-          .from('profiles')
-          .update({ super_votes_credit: newCredit })
-          .eq('id', userId);
-        if (credErr) {
-          console.warn('Credit update error:', credErr);
+      if (instantOk) {
+        // Sadece test anlık onayı: admin/RPC ile kredi (client doğrudan yazamaz)
+        try {
+          await supabase.rpc('add_super_votes_credit', {
+            target_user: userId,
+            amount: params.super_votes_amount,
+          });
+        } catch (credRpcErr) {
+          console.warn('add_super_votes_credit rpc:', credRpcErr);
+          const { error: credErr } = await supabase
+            .from('profiles')
+            .update({ super_votes_credit: newCredit })
+            .eq('id', userId);
+          if (credErr) console.warn('Credit update error:', credErr);
+        }
+
+        // Ödül havuzuna katkı
+        try {
+          const { data: st } = await supabase
+            .from('settings')
+            .select('pool_contribution_percentage, accumulated_pool_usd, base_first_prize')
+            .eq('id', 1)
+            .maybeSingle();
+          const pct = Number(st?.pool_contribution_percentage ?? 20);
+          const prevPool = Number(st?.accumulated_pool_usd ?? 0);
+          const addition = Number(params.amount) * (pct / 100);
+          const nextPool = Number((prevPool + addition).toFixed(2));
+          await supabase
+            .from('settings')
+            .update({
+              accumulated_pool_usd: nextPool,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', 1);
+        } catch (poolErr) {
+          console.warn('Reward pool update error:', poolErr);
         }
 
         try {
