@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Contestant, Transaction } from '../types';
 import { TranslationDictionary } from '../i18n/translations';
 import { Shield, Check, X, ExternalLink, Copy, FileCode, Users, DollarSign, Heart, AlertCircle, CheckCircle2, Award, Sparkles, TrendingUp, Percent, Save, Zap, CreditCard } from 'lucide-react';
-import { fetchAdminPendingApi } from '../lib/api';
+import { fetchAdminPendingApi, fetchSettingsApi, saveSettingsApi, type RewardSettings } from '../lib/api';
 
 interface AdminPanelProps {
   t: TranslationDictionary;
@@ -11,9 +11,10 @@ interface AdminPanelProps {
     id: string;
     action: 'approve' | 'reject';
   }) => Promise<void>;
+  onSettingsSaved?: (settings: RewardSettings) => void;
 }
 
-export const AdminPanel: React.FC<AdminPanelProps> = ({ t, onAdminAction }) => {
+export const AdminPanel: React.FC<AdminPanelProps> = ({ t, onAdminAction, onSettingsSaved }) => {
   const [activeTab, setActiveTab] = useState<'applicants' | 'transactions' | 'rewards' | 'gateways' | 'sql'>('applicants');
   const [pendingApplicants, setPendingApplicants] = useState<Contestant[]>([]);
   const [pendingTransactions, setPendingTransactions] = useState<Transaction[]>([]);
@@ -67,14 +68,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ t, onAdminAction }) => {
         }
       }
 
-      const settingsRes = await fetch('/api/settings');
-      const settingsContentType = settingsRes.headers.get('content-type');
-      if (settingsRes.ok && settingsContentType && settingsContentType.includes('application/json')) {
-        const settingsData = await settingsRes.json();
+      try {
+        const settingsData = await fetchSettingsApi();
         if (settingsData && typeof settingsData.pool_contribution_percentage === 'number') {
-          setSettings(settingsData);
+          setSettings({
+            pool_contribution_percentage: settingsData.pool_contribution_percentage,
+            base_first_prize: settingsData.base_first_prize,
+            base_second_prize: settingsData.base_second_prize,
+            base_third_prize: settingsData.base_third_prize,
+            accumulated_pool_usd: settingsData.accumulated_pool_usd,
+            first_place_prize_usd: settingsData.first_place_prize_usd,
+          });
         }
-      }
+      } catch (e) {}
     } catch (err) {
       console.error('Failed to fetch admin data', err);
     } finally {
@@ -99,30 +105,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ t, onAdminAction }) => {
     e.preventDefault();
     setSavingSettings(true);
     try {
-      const res = await fetch('/api/admin/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pool_contribution_percentage: Number(settings.pool_contribution_percentage),
-          base_first_prize: Number(settings.base_first_prize),
-          base_second_prize: Number(settings.base_second_prize),
-          base_third_prize: Number(settings.base_third_prize),
-        }),
+      const saved = await saveSettingsApi({
+        pool_contribution_percentage: Number(settings.pool_contribution_percentage),
+        base_first_prize: Number(settings.base_first_prize),
+        base_second_prize: Number(settings.base_second_prize),
+        base_third_prize: Number(settings.base_third_prize),
       });
-      const contentType = res.headers.get('content-type');
-      if (res.ok && contentType && contentType.includes('application/json')) {
-        const data = await res.json();
-        if (data.success && data.settings) {
-          setSettings(data.settings);
-          setSettingsSaved(true);
-          setTimeout(() => setSettingsSaved(false), 3000);
-        }
-      } else {
-        setSettingsSaved(true);
-        setTimeout(() => setSettingsSaved(false), 3000);
-      }
-    } catch (err) {
-      alert('Failed to save reward settings');
+      setSettings({
+        pool_contribution_percentage: saved.pool_contribution_percentage,
+        base_first_prize: saved.base_first_prize,
+        base_second_prize: saved.base_second_prize,
+        base_third_prize: saved.base_third_prize,
+        accumulated_pool_usd: saved.accumulated_pool_usd,
+        first_place_prize_usd: saved.first_place_prize_usd,
+      });
+      onSettingsSaved?.(saved);
+      setSettingsSaved(true);
+      setTimeout(() => setSettingsSaved(false), 3000);
+    } catch (err: any) {
+      alert(err?.message || 'Failed to save reward settings');
     } finally {
       setSavingSettings(false);
     }
