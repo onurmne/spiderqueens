@@ -45,14 +45,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           role,
         });
 
-        onRegisterSuccess(user, role);
-
         if (requiresConfirmation) {
-          setSuccessMsg('Kayıt başarılı! E-posta adresinize (Spam klasörü dahil) doğrulama bağlantısı gönderildi. Lütfen e-postanızı onaylayın.');
+          setSuccessMsg('Kayıt alındı. Giriş yapmadan önce e-postanızdaki doğrulama linkine tıklayın (Spam klasörüne de bakın). Onay sonrası Giriş yapın.');
           setTimeout(() => {
             onClose();
-          }, 3500);
+          }, 4000);
         } else {
+          onRegisterSuccess(user, role);
           onClose();
         }
       } else {
