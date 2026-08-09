@@ -13,7 +13,7 @@ interface StoreModalProps {
     payment_method: PaymentMethod;
     tx_hash_or_note?: string;
     crypto_asset?: CryptoAsset;
-  }) => Promise<void>;
+  }) => Promise<{ status?: string; super_votes_credit?: number } | void>;
 }
 
 const PACKAGES: SuperVotePackage[] = [
@@ -64,7 +64,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
 
     setLoading(true);
     try {
-      await onPurchase({
+      const result = await onPurchase({
         amount: selectedPkg.price,
         super_votes_amount: selectedPkg.votes,
         payment_method: paymentMethod,
@@ -72,10 +72,16 @@ export const StoreModal: React.FC<StoreModalProps> = ({
         crypto_asset: paymentMethod === 'crypto_manual' ? cryptoAsset : undefined,
       });
 
-      if (paymentMethod === 'credit_card') {
-        setSuccessMsg('Payment Successful! Super Votes added to your account instantly.');
+      const status = (result && (result as any).status) || 'pending';
+      if (status === 'approved') {
+        setSuccessMsg('Payment Successful! Super Votes added to your account.');
       } else {
-        setSuccessMsg(t.paymentSubmittedMsg);
+        // Canlı güvenli mod: anında kredi yok, admin/ödeme onayı beklenir
+        setSuccessMsg(
+          paymentMethod === 'credit_card'
+            ? 'Ödeme kaydınız alındı. Super Vote kredisi admin onayından sonra hesabınıza yüklenecektir. (Durum: Beklemede)'
+            : (t.paymentSubmittedMsg || 'Ödeme bildiriminiz alındı. Onay sonrası krediniz yüklenecektir.')
+        );
       }
 
       setTimeout(() => {
