@@ -61,7 +61,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         onClose();
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Bir hata oluştu');
+      const raw = err?.message || '';
+      if (raw === 'ALREADY_REGISTERED' || raw.toLowerCase().includes('already registered')) {
+        setErrorMsg(t.authAlreadyRegistered || 'Bu e-posta zaten kayıtlı. Lütfen giriş yapın veya şifrenizi sıfırlayın.');
+        setMode('login');
+      } else {
+        setErrorMsg(raw || 'Bir hata oluştu');
+      }
     } finally {
       setLoading(false);
     }
