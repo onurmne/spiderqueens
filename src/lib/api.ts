@@ -166,13 +166,48 @@ export async function fetchIpStatusApi(fingerprintHash: string) {
   return { free_votes_remaining: 5, free_votes_used: 0 };
 }
 
-// Fetch User Profile
+// Fetch User Profile — her zaman Supabase profiles'dan güncel kredi çek
 export async function fetchUserProfileApi(): Promise<UserProfile | null> {
+  // 1) Supabase Auth + profiles (canlı kaynak)
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      const authUser = authData?.user;
+      if (authUser?.id) {
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', authUser.id)
+          .maybeSingle();
+
+        const userProfile: UserProfile = {
+          id: authUser.id,
+          email: authUser.email || prof?.email || '',
+          full_name: prof?.full_name || authUser.user_metadata?.full_name || (authUser.email || '').split('@')[0],
+          role: prof?.role || authUser.user_metadata?.role || 'voter',
+          is_admin: Boolean(prof?.is_admin),
+          super_votes_credit: typeof prof?.super_votes_credit === 'number' ? prof.super_votes_credit : 0,
+          created_at: prof?.created_at || new Date().toISOString(),
+        };
+
+        try {
+          localStorage.setItem('sq_user_session', JSON.stringify(userProfile));
+        } catch (e) {}
+
+        return userProfile;
+      }
+    } catch (e) {
+      console.warn('fetchUserProfileApi supabase:', e);
+    }
+  }
+
+  // 2) Local express (dev)
   const result = await safeJsonFetch('/api/user/profile');
   if (result.ok && result.data && result.data.email && result.data.email.trim() !== '') {
     return result.data;
   }
 
+  // 3) localStorage fallback
   try {
     const saved = localStorage.getItem('sq_user_session');
     if (saved) {
