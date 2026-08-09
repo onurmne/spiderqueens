@@ -258,46 +258,65 @@ export async function registerUserApi(params: {
         throw new Error(authError.message);
       }
 
-      // If no session (email confirm required), try immediate password sign-in (works when confirm is off)
-      let sessionUser = authData.user;
-      let session = authData.session;
-      if (sessionUser && !session) {
-        const { data: loginData, error: loginErr } = await supabase.auth.signInWithPassword({
-          email: params.email,
-          password,
-        });
-        if (!loginErr && loginData.user) {
-          sessionUser = loginData.user;
-          session = loginData.session;
-        }
-      }
-
+      // E-posta onayı zorunlu: session yoksa otomatik giriş YAPMA
+      const sessionUser = authData.user;
+      const session = authData.session;
       const requiresConfirmation = Boolean(sessionUser && !session);
-      const realId = sessionUser?.id;
-      if (!realId) {
-        throw new Error('Kayıt tamamlanamadı. E-posta onayını kontrol edin veya giriş yapmayı deneyin.');
+
+      if (requiresConfirmation || !session) {
+        // Profil satırı trigger ile oluşabilir; kredi asla vermiyoruz
+        return {
+          user: {
+            id: sessionUser?.id || '',
+            email: params.email,
+            full_name: params.full_name,
+            role: params.role,
+            is_admin: false,
+            super_votes_credit: 0,
+            created_at: new Date().toISOString(),
+          },
+          requiresConfirmation: true,
+        };
       }
 
-      const starterCredit = isUnlimitedTestEmail(params.email) ? 999 : 0;
+      const realId = sessionUser!.id;
 
-      await supabase.from('profiles').upsert([
-        {
-          id: realId,
-          email: params.email,
-          full_name: params.full_name,
-          role: params.role,
-          is_admin: isAdminEmail(params.email),
-          super_votes_credit: starterCredit,
-        },
-      ]);
+      // Yeni üye: super_votes_credit = 0 (var olan krediyi ezme)
+      const { data: existingProf } = await supabase
+        .from('profiles')
+        .select('super_votes_credit, is_admin')
+        .eq('id', realId)
+        .maybeSingle();
+
+      if (!existingProf) {
+        await supabase.from('profiles').insert([
+          {
+            id: realId,
+            email: params.email,
+            full_name: params.full_name,
+            role: params.role,
+            is_admin: false,
+            super_votes_credit: 0,
+          },
+        ]);
+      } else {
+        await supabase
+          .from('profiles')
+          .update({
+            email: params.email,
+            full_name: params.full_name,
+            role: params.role,
+          })
+          .eq('id', realId);
+      }
 
       const userProfile: UserProfile = {
         id: realId,
         email: params.email,
         full_name: params.full_name,
         role: params.role,
-        is_admin: isAdminEmail(params.email),
-        super_votes_credit: starterCredit,
+        is_admin: Boolean(existingProf?.is_admin),
+        super_votes_credit: typeof existingProf?.super_votes_credit === 'number' ? existingProf.super_votes_credit : 0,
         created_at: new Date().toISOString(),
       };
 
@@ -305,7 +324,7 @@ export async function registerUserApi(params: {
         localStorage.setItem('sq_user_session', JSON.stringify(userProfile));
       } catch (e) {}
 
-      return { user: userProfile, requiresConfirmation };
+      return { user: userProfile, requiresConfirmation: false };
     } catch (e: any) {
       console.warn('Supabase Auth error:', e);
       if (e.message) throw e;
@@ -368,34 +387,39 @@ export async function loginUserApi(params: {
       });
 
       if (authError) {
+        const msg = (authError.message || '').toLowerCase();
+        if (msg.includes('email not confirmed') || msg.includes('not confirmed')) {
+          throw new Error('E-posta adresiniz henüz onaylanmamış. Lütfen gelen kutunuzdaki (Spam dahil) doğrulama linkine tıklayın.');
+        }
         throw new Error('E-posta veya şifre hatalı. Lütfen bilgilerinizi kontrol edin.');
       }
 
       if (authData.user) {
+        // Onaysız hesap ile oturum açılmamalı
+        const confirmed = (authData.user as any).email_confirmed_at || (authData.user as any).confirmed_at;
+        if (!confirmed) {
+          try { await supabase.auth.signOut(); } catch (_) {}
+          throw new Error('E-posta adresiniz henüz onaylanmamış. Lütfen doğrulama linkine tıklayın, sonra giriş yapın.');
+        }
+
         const { data: prof } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', authData.user.id)
           .maybeSingle();
 
-        // Ensure profile row exists
+        // Profil yoksa 0 kredi ile oluştur — asla hediye Super Vote verme
         if (!prof) {
-          const starterCredit = isUnlimitedTestEmail(params.email) ? 999 : 0;
-          await supabase.from('profiles').upsert([
+          await supabase.from('profiles').insert([
             {
               id: authData.user.id,
               email: params.email,
               full_name: authData.user.user_metadata?.full_name || params.email.split('@')[0],
               role: authData.user.user_metadata?.role || 'voter',
-              is_admin: isAdminEmail(params.email),
-              super_votes_credit: starterCredit,
+              is_admin: false,
+              super_votes_credit: 0,
             },
           ]);
-        } else if (isUnlimitedTestEmail(params.email) && (prof.super_votes_credit || 0) < 50) {
-          await supabase
-            .from('profiles')
-            .update({ is_admin: true, super_votes_credit: 999 })
-            .eq('id', authData.user.id);
         }
 
         const { data: prof2 } = await supabase
@@ -409,8 +433,8 @@ export async function loginUserApi(params: {
           email: authData.user.email || params.email,
           full_name: prof2?.full_name || authData.user.user_metadata?.full_name || params.email.split('@')[0],
           role: prof2?.role || authData.user.user_metadata?.role || 'voter',
-          is_admin: prof2?.is_admin ?? isAdminEmail(params.email),
-          super_votes_credit: prof2?.super_votes_credit ?? (isUnlimitedTestEmail(params.email) ? 999 : 0),
+          is_admin: Boolean(prof2?.is_admin),
+          super_votes_credit: typeof prof2?.super_votes_credit === 'number' ? prof2.super_votes_credit : 0,
           created_at: prof2?.created_at || new Date().toISOString(),
         };
 
