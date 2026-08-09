@@ -168,7 +168,8 @@ export default function App() {
   }) => {
     const result = await createTransactionApi(params);
 
-    if (result.super_votes_credit !== undefined) {
+    // Sadece gerçekten onaylandıysa kredi UI'da güncellenir
+    if (result?.status === 'approved' && result.super_votes_credit !== undefined) {
       setUserProfile((prev) => ({
         ...prev,
         super_votes_credit: result.super_votes_credit,
@@ -176,6 +177,7 @@ export default function App() {
     }
 
     await fetchData();
+    return result;
   };
 
   const handleAdminAction = async (params: {
