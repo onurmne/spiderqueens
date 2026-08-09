@@ -247,15 +247,22 @@ export async function registerUserApi(params: {
       });
 
       if (authError) {
-        // Already registered → try login instead
+        const m = (authError.message || '').toLowerCase();
         if (
-          authError.message.includes('already registered') ||
-          authError.message.includes('User already exists') ||
-          authError.message.toLowerCase().includes('already been registered')
+          m.includes('already registered') ||
+          m.includes('user already exists') ||
+          m.includes('already been registered') ||
+          m.includes('already exists')
         ) {
-          return loginUserApi({ email: params.email, password });
+          throw new Error('ALREADY_REGISTERED');
         }
         throw new Error(authError.message);
+      }
+
+      // Supabase bazen mevcut kullanıcıda hata vermez; identities boş gelir
+      const identities = (authData.user as any)?.identities;
+      if (Array.isArray(identities) && identities.length === 0) {
+        throw new Error('ALREADY_REGISTERED');
       }
 
       // E-posta onayı zorunlu: session yoksa otomatik giriş YAPMA
