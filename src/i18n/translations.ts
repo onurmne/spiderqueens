@@ -128,6 +128,7 @@ export interface TranslationDictionary {
   emailLabel: string;
   passwordLabel: string;
   submitRegister: string;
+  authAlreadyRegistered: string;
   submitLogin: string;
 
   // Prize Banner
@@ -285,6 +286,7 @@ export const translations: Record<Language, TranslationDictionary> = {
     emailLabel: "Email Address",
     passwordLabel: "Password",
     submitRegister: "Create Account & Start",
+    authAlreadyRegistered: "This email is already registered. Please log in or reset your password.",
     submitLogin: "Log In to Account",
 
     prizeBannerTitle: "Monthly Championship Rewards",
@@ -437,6 +439,7 @@ export const translations: Record<Language, TranslationDictionary> = {
     emailLabel: "E-Posta Adresi",
     passwordLabel: "Şifre",
     submitRegister: "Kayıt Ol & Başla",
+    authAlreadyRegistered: "Bu e-posta zaten kayıtlı. Lütfen giriş yapın veya şifrenizi sıfırlayın.",
     submitLogin: "Giriş Yap",
 
     prizeBannerTitle: "Aylık Şampiyona Ödül Havuzu",
@@ -589,6 +592,7 @@ export const translations: Record<Language, TranslationDictionary> = {
     emailLabel: "Email Адрес",
     passwordLabel: "Пароль",
     submitRegister: "Зарегистрироваться",
+    authAlreadyRegistered: "Этот email уже зарегистрирован. Войдите или сбросьте пароль.",
     submitLogin: "Войти в Аккаунт",
 
     prizeBannerTitle: "Ежемесячные Награды Чемпионата",
@@ -741,6 +745,7 @@ export const translations: Record<Language, TranslationDictionary> = {
     emailLabel: "อีเมล",
     passwordLabel: "รหัสผ่าน",
     submitRegister: "ลงทะเบียนและเริ่มต้น",
+    authAlreadyRegistered: "อีเมลนี้ถูกลงทะเบียนแล้ว กรุณาเข้าสู่ระบบหรือรีเซ็ตรหัสผ่าน",
     submitLogin: "เข้าสู่ระบบ",
 
     prizeBannerTitle: "เงินรางวัลประจำเดือน",
@@ -893,6 +898,7 @@ export const translations: Record<Language, TranslationDictionary> = {
     emailLabel: "メールアドレス",
     passwordLabel: "パスワード",
     submitRegister: "登録して始める",
+    authAlreadyRegistered: "このメールアドレスは既に登録されています。ログインするかパスワードをリセットしてください。",
     submitLogin: "ログイン",
 
     prizeBannerTitle: "月間チャンピオンシップ賞金",
@@ -1045,6 +1051,7 @@ export const translations: Record<Language, TranslationDictionary> = {
     emailLabel: "邮箱地址",
     passwordLabel: "密码",
     submitRegister: "注册并开始",
+    authAlreadyRegistered: "该邮箱已注册。请登录或重置密码。",
     submitLogin: "登录账号",
 
     prizeBannerTitle: "本月锦标赛大奖池",
@@ -1197,6 +1204,7 @@ export const translations: Record<Language, TranslationDictionary> = {
     emailLabel: "이메일 주소",
     passwordLabel: "비밀번호",
     submitRegister: "가입하고 시작하기",
+    authAlreadyRegistered: "이미 등록된 이메일입니다. 로그인하거나 비밀번호를 재설정하세요.",
     submitLogin: "로그인",
 
     prizeBannerTitle: "월간 챔피언십 상금",
