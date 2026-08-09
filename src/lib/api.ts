@@ -265,73 +265,74 @@ export async function registerUserApi(params: {
         throw new Error('ALREADY_REGISTERED');
       }
 
-      // E-posta onayı zorunlu: session yoksa otomatik giriş YAPMA
       const sessionUser = authData.user;
-      const session = authData.session;
-      const requiresConfirmation = Boolean(sessionUser && !session);
+      const realId = sessionUser?.id;
 
-      if (requiresConfirmation || !session) {
-        // Profil satırı trigger ile oluşabilir; kredi asla vermiyoruz
-        return {
-          user: {
-            id: sessionUser?.id || '',
-            email: params.email,
-            full_name: params.full_name,
-            role: params.role,
-            is_admin: false,
-            super_votes_credit: 0,
-            created_at: new Date().toISOString(),
-          },
-          requiresConfirmation: true,
-        };
+      // Profil: sadece 0 kredi — asla hediye Super Vote yok
+      if (realId) {
+        try {
+          const { data: existingProf } = await supabase
+            .from('profiles')
+            .select('id, super_votes_credit')
+            .eq('id', realId)
+            .maybeSingle();
+
+          if (!existingProf) {
+            await supabase.from('profiles').insert([
+              {
+                id: realId,
+                email: params.email,
+                full_name: params.full_name,
+                role: params.role,
+                is_admin: false,
+                super_votes_credit: 0,
+              },
+            ]);
+          } else if ((existingProf.super_votes_credit || 0) !== 0) {
+            // Yanlışlıkla yazılmış hediye krediyi temizle (kayıt anı)
+            try {
+              await supabase.rpc('add_super_votes_credit', {
+                target_user: realId,
+                amount: -(existingProf.super_votes_credit || 0),
+              });
+            } catch (_) {
+              // trigger engellerse SQL ile düzeltilir; client'ta 0 göster
+            }
+          } else {
+            await supabase
+              .from('profiles')
+              .update({
+                email: params.email,
+                full_name: params.full_name,
+                role: params.role,
+              })
+              .eq('id', realId);
+          }
+        } catch (profErr) {
+          console.warn('profile bootstrap:', profErr);
+        }
       }
 
-      const realId = sessionUser!.id;
-
-      // Yeni üye: super_votes_credit = 0 (var olan krediyi ezme)
-      const { data: existingProf } = await supabase
-        .from('profiles')
-        .select('super_votes_credit, is_admin')
-        .eq('id', realId)
-        .maybeSingle();
-
-      if (!existingProf) {
-        await supabase.from('profiles').insert([
-          {
-            id: realId,
-            email: params.email,
-            full_name: params.full_name,
-            role: params.role,
-            is_admin: false,
-            super_votes_credit: 0,
-          },
-        ]);
-      } else {
-        await supabase
-          .from('profiles')
-          .update({
-            email: params.email,
-            full_name: params.full_name,
-            role: params.role,
-          })
-          .eq('id', realId);
-      }
-
-      const userProfile: UserProfile = {
-        id: realId,
-        email: params.email,
-        full_name: params.full_name,
-        role: params.role,
-        is_admin: Boolean(existingProf?.is_admin),
-        super_votes_credit: typeof existingProf?.super_votes_credit === 'number' ? existingProf.super_votes_credit : 0,
-        created_at: new Date().toISOString(),
-      };
-
+      // ZORUNLU: kayıt sonrası oturum açma — e-posta onayı / manuel giriş
       try {
-        localStorage.setItem('sq_user_session', JSON.stringify(userProfile));
-      } catch (e) {}
+        await supabase.auth.signOut();
+      } catch (_) {}
+      try {
+        localStorage.removeItem('sq_user_session');
+      } catch (_) {}
 
-      return { user: userProfile, requiresConfirmation: false };
+      return {
+        user: {
+          id: realId || '',
+          email: params.email,
+          full_name: params.full_name,
+          role: params.role,
+          is_admin: false,
+          super_votes_credit: 0,
+          created_at: new Date().toISOString(),
+        },
+        requiresConfirmation: true,
+      };
     } catch (e: any) {
       console.warn('Supabase Auth error:', e);
       if (e.message) throw e;
