@@ -120,7 +120,7 @@ export const VersusClash: React.FC<VersusClashProps> = ({
         </div>
 
         <h1 className="text-3xl sm:text-5xl font-black text-white italic tracking-tight uppercase">
-          SpiderQueens <span className="text-pink-500">Clash Arena</span>
+          SpiderQueens <span className="text-pink-500">{t.clashArenaTitle}</span>
         </h1>
 
         {/* Free Vote Bar */}
@@ -358,11 +358,11 @@ export const VersusClash: React.FC<VersusClashProps> = ({
                 1st
               </div>
               <div>
-                <span className="text-[10px] text-gray-400 font-bold uppercase block">#1 Place</span>
+                <span className="text-[10px] text-gray-400 font-bold uppercase block">{t.placeLabel1}</span>
                 <span className="text-xs font-black text-amber-400 flex items-center gap-1">
                   <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
                   <span>
-                    {formatPrizeUsd(rewardSettings.first_place_prize_usd || rewardSettings.base_first_prize)} NAKİT ÖDÜL (1. Sıra)
+                    {formatPrizeUsd(rewardSettings.first_place_prize_usd || rewardSettings.base_first_prize)} {t.cashLabel} ({t.placeLabel1})
                   </span>
                 </span>
               </div>
@@ -374,11 +374,11 @@ export const VersusClash: React.FC<VersusClashProps> = ({
                 2nd
               </div>
               <div>
-                <span className="text-[10px] text-gray-400 font-bold uppercase block">#2 Place</span>
+                <span className="text-[10px] text-gray-400 font-bold uppercase block">{t.placeLabel2}</span>
                 <span className="text-xs font-black text-gray-200 flex items-center gap-1">
                   <Gift className="w-3.5 h-3.5 text-pink-400" />
                   <span>
-                    {formatPrizeUsd(rewardSettings.base_second_prize)} HEDİYE ÇEKİ (2. Sıra)
+                    {formatPrizeUsd(rewardSettings.base_second_prize)} {t.voucherLabel} ({t.placeLabel2})
                   </span>
                 </span>
               </div>
@@ -390,11 +390,11 @@ export const VersusClash: React.FC<VersusClashProps> = ({
                 3rd
               </div>
               <div>
-                <span className="text-[10px] text-gray-400 font-bold uppercase block">#3 Place</span>
+                <span className="text-[10px] text-gray-400 font-bold uppercase block">{t.placeLabel3}</span>
                 <span className="text-xs font-black text-amber-300 flex items-center gap-1">
                   <Award className="w-3.5 h-3.5 text-amber-400" />
                   <span>
-                    {formatPrizeUsd(rewardSettings.base_third_prize)} HEDİYE ÇEKİ (3. Sıra)
+                    {formatPrizeUsd(rewardSettings.base_third_prize)} {t.voucherLabel} ({t.placeLabel3})
                   </span>
                 </span>
               </div>
