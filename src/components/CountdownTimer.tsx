@@ -58,7 +58,7 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
 
   const first = rewardSettings.first_place_prize_usd || rewardSettings.base_first_prize;
   const second = rewardSettings.base_second_prize;
-  const prizeDetailsLive = `${formatPrizeUsd(first)} Nakit + ${formatPrizeUsd(second)} Hediye Çeki`;
+  const prizeDetailsLive = `${formatPrizeUsd(first)} ${t.cashLabel} + ${formatPrizeUsd(second)} ${t.voucherLabel}`;
 
   return (
     <div className="w-full bg-[#0F0F12] border-b border-white/10 py-2 px-6">
