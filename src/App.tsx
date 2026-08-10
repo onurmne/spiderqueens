@@ -46,9 +46,8 @@ export default function App() {
   const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
   const [isProfileOpen, setIsProfileOpen] = useState<boolean>(false);
   const [infoModalType, setInfoModalType] = useState<'faq' | 'rules' | 'privacy' | null>(null);
-  const [adminPassword, setAdminPassword] = useState<string>('');
-  const [isAdminUnlocked, setIsAdminUnlocked] = useState<boolean>(false);
-  const [adminError, setAdminError] = useState<string>('');
+  const [paymentResult, setPaymentResult] = useState<'success' | 'failed' | null>(null);
+  const [paymentResultDetail, setPaymentResultDetail] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [rewardSettings, setRewardSettings] = useState<RewardSettings>(DEFAULT_REWARD_SETTINGS);
 
@@ -114,15 +113,13 @@ export default function App() {
       const q = new URLSearchParams(window.location.search);
       const payment = q.get('payment');
       if (payment === 'success') {
-        alert('Ödeme başarılı! Super Vote krediniz hesabınıza tanımlandı.');
+        setPaymentResult('success');
+        setPaymentResultDetail(q.get('votes') || '');
         fetchData();
         window.history.replaceState({}, '', window.location.pathname);
       } else if (payment === 'failed') {
-        const reason = q.get('reason') || '';
-        alert(
-          'Ödeme tamamlanamadı veya iptal edildi.' +
-            (reason ? '\nDetay: ' + reason : '')
-        );
+        setPaymentResult('failed');
+        setPaymentResultDetail(q.get('reason') || '');
         window.history.replaceState({}, '', window.location.pathname);
       }
     } catch (e) {}
@@ -241,16 +238,7 @@ export default function App() {
     await fetchData();
   };
 
-  const handleAdminLoginSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (adminPassword === 'admin' || adminPassword === 'spider2026' || adminPassword === '123456') {
-      setIsAdminUnlocked(true);
-      setUserProfile((prev) => ({ ...prev, is_admin: true }));
-      setAdminError('');
-    } else {
-      setAdminError('Yönetici şifresi hatalı.');
-    }
-  };
+  // Admin: sadece profiles.is_admin === true (şifre kapısı kaldırıldı)
 
   return (
     <div className="min-h-screen bg-[#0A0A0C] text-gray-200 font-sans selection:bg-pink-500 selection:text-white flex flex-col justify-between bg-grid-pattern overflow-x-hidden">
@@ -307,7 +295,7 @@ export default function App() {
 
             {/* Hidden Admin Access Route (/admin) */}
             {activeTab === 'admin' && (
-              isAdminUnlocked || userProfile.is_admin ? (
+              userProfile.is_admin ? (
                 <AdminPanel
                   t={t}
                   onAdminAction={handleAdminAction}
@@ -320,35 +308,19 @@ export default function App() {
                       <Lock className="w-7 h-7" />
                     </div>
                     <h2 className="text-xl font-black text-white italic tracking-tight uppercase mb-1">
-                      Yönetici Girişi (Admin Portal)
+                      Yönetici Paneli
                     </h2>
-                    <p className="text-xs text-gray-400 mb-6">
-                      Lütfen devam etmek için yönetici güvenlik şifrenizi giriniz.
+                    <p className="text-xs text-gray-400 mb-4">
+                      Bu alana yalnızca yetkili yönetici hesabı ile giriş yapılabilir.
+                      Lütfen admin e-posta adresinizle oturum açın.
                     </p>
-
-                    {adminError && (
-                      <div className="mb-4 p-2.5 rounded-xl bg-red-950/80 border border-red-500/50 text-red-300 text-xs font-bold">
-                        {adminError}
-                      </div>
-                    )}
-
-                    <form onSubmit={handleAdminLoginSubmit} className="space-y-4">
-                      <input
-                        type="password"
-                        required
-                        value={adminPassword}
-                        onChange={(e) => setAdminPassword(e.target.value)}
-                        placeholder="Yönetici Şifresi"
-                        className="w-full px-4 py-3 rounded-xl bg-[#151518] border border-white/10 focus:border-amber-500 text-white text-xs outline-none text-center"
-                      />
-                      <button
-                        type="submit"
-                        className="w-full py-3 px-6 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-600 hover:brightness-110 text-slate-950 font-black text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2"
-                      >
-                        <span>Panele Giriş Yap</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </button>
-                    </form>
+                    <button
+                      type="button"
+                      onClick={() => setIsAuthOpen(true)}
+                      className="w-full py-3 rounded-xl bg-amber-500 text-black font-extrabold text-sm hover:brightness-110 cursor-pointer"
+                    >
+                      Giriş Yap
+                    </button>
                   </div>
                 </div>
               )
@@ -364,15 +336,9 @@ export default function App() {
         onClose={() => setIsAuthOpen(false)}
         onLoginSuccess={(user) => {
           setUserProfile(user);
-          if ((user?.email || '').toLowerCase() === 'onurmne@gmail.com') {
-            setFreeVotesRemaining(9999);
-          }
         }}
         onRegisterSuccess={(user, role) => {
           setUserProfile(user);
-          if ((user?.email || '').toLowerCase() === 'onurmne@gmail.com') {
-            setFreeVotesRemaining(9999);
-          }
           if (role === 'contestant') {
             setActiveTab('join');
           }
@@ -407,6 +373,41 @@ export default function App() {
       />
 
       {/* Info Modal for FAQ / Rules / Privacy */}
+      
+      {/* Payment result modal */}
+      {paymentResult && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="relative w-full max-w-md bg-[#0F0F12] border border-white/10 rounded-3xl p-8 shadow-2xl text-center">
+            <div className={`w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center border ${
+              paymentResult === 'success'
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                : 'bg-red-500/10 border-red-500/30 text-red-400'
+            }`}>
+              {paymentResult === 'success' ? '✓' : '!'}
+            </div>
+            <h3 className="text-xl font-black text-white italic uppercase mb-2">
+              {paymentResult === 'success' ? 'Ödeme Başarılı' : 'Ödeme Tamamlanamadı'}
+            </h3>
+            <p className="text-sm text-gray-300 mb-6">
+              {paymentResult === 'success'
+                ? (paymentResultDetail
+                    ? `Super Vote krediniz hesabınıza tanımlandı. (+${paymentResultDetail})`
+                    : 'Super Vote krediniz hesabınıza tanımlandı.')
+                : (paymentResultDetail
+                    ? `İşlem başarısız veya iptal edildi. (${paymentResultDetail})`
+                    : 'İşlem başarısız veya iptal edildi. Lütfen tekrar deneyin.')}
+            </p>
+            <button
+              type="button"
+              onClick={() => { setPaymentResult(null); setPaymentResultDetail(''); fetchData(); }}
+              className="w-full py-3 rounded-xl bg-pink-500 text-white font-extrabold text-sm hover:brightness-110 cursor-pointer"
+            >
+              Tamam
+            </button>
+          </div>
+        </div>
+      )}
+
       <InfoModal
         t={t}
         type={infoModalType}
