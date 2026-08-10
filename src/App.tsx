@@ -108,6 +108,22 @@ export default function App() {
     fetchData();
   }, []);
 
+  // iyzico dönüş: ?payment=success|failed
+  useEffect(() => {
+    try {
+      const q = new URLSearchParams(window.location.search);
+      const payment = q.get('payment');
+      if (payment === 'success') {
+        alert('Ödeme başarılı! Super Vote krediniz hesabınıza tanımlandı.');
+        fetchData();
+        window.history.replaceState({}, '', window.location.pathname);
+      } else if (payment === 'failed') {
+        alert('Ödeme tamamlanamadı veya iptal edildi.');
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    } catch (e) {}
+  }, []);
+
   const isLoggedIn = Boolean(
     userProfile && 
     userProfile.email && 
@@ -166,9 +182,33 @@ export default function App() {
     tx_hash_or_note?: string;
     crypto_asset?: CryptoAsset;
   }) => {
+    // Kredi kartı → iyzico Checkout (sandbox/production)
+    if (params.payment_method === 'credit_card') {
+      if (!userProfile?.id || !userProfile?.email) {
+        throw new Error('Ödeme için giriş yapmalısınız.');
+      }
+      const res = await fetch('/api/iyzico/init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: params.amount,
+          super_votes_amount: params.super_votes_amount,
+          user_id: userProfile.id,
+          user_email: userProfile.email,
+          full_name: userProfile.full_name,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.paymentPageUrl) {
+        throw new Error(data?.error || data?.detail || 'iyzico ödeme başlatılamadı');
+      }
+      // Kullanıcıyı iyzico ödeme sayfasına yönlendir
+      window.location.href = data.paymentPageUrl;
+      return { status: 'pending', redirect: true };
+    }
+
     const result = await createTransactionApi(params);
 
-    // Sadece gerçekten onaylandıysa kredi UI'da güncellenir
     if (result?.status === 'approved' && result.super_votes_credit !== undefined) {
       setUserProfile((prev) => ({
         ...prev,
