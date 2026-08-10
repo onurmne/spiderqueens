@@ -128,7 +128,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <Zap className="w-3 h-3 fill-current sm:hidden text-amber-400" />
                 <div className="w-2 h-2 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.6)] animate-pulse hidden sm:block" />
                 <span className="font-mono text-[11px] sm:text-xs">
-                  {userProfile.super_votes_credit} <span className="hidden sm:inline">Super Vote</span>
+                  {userProfile.super_votes_credit} <span className="hidden sm:inline">{t.superVote}</span>
                 </span>
               </div>
               <button
