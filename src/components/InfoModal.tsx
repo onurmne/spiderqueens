@@ -108,7 +108,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({ t, type, onClose }) => {
                 <h3 className="text-2xl font-black text-white italic uppercase tracking-tight">
                   {t.privacyNav}
                 </h3>
-                <p className="text-xs text-gray-400">Data Security & Privacy Commitment</p>
+                <p className="text-xs text-gray-400">{t.privacySubtitle}</p>
               </div>
             </div>
 
