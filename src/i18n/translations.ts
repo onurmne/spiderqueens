@@ -136,6 +136,18 @@ export interface TranslationDictionary {
   firstPlacePrize: string;
   secondPlacePrize: string;
   thirdPlacePrize: string;
+  cashLabel: string;
+  voucherLabel: string;
+  directoryTitle: string;
+  directorySubtitle: string;
+  sortMostVotes: string;
+  sortNewest: string;
+  searchPlaceholder: string;
+  noCosplayersFound: string;
+  clashArenaTitle: string;
+  placeLabel1: string;
+  placeLabel2: string;
+  placeLabel3: string;
 
   // Legal & FAQ
   faqNav: string;
@@ -293,6 +305,18 @@ export const translations: Record<Language, TranslationDictionary> = {
     firstPlacePrize: "$1,000 CASH (1st Place)",
     secondPlacePrize: "$250 Gift Voucher (2nd Place)",
     thirdPlacePrize: "$50 Gift Voucher (3rd Place)",
+    cashLabel: "Cash",
+    voucherLabel: "Gift Voucher",
+    directoryTitle: "Directory",
+    directorySubtitle: "Browse all approved cosplayers competing in the tournament.",
+    sortMostVotes: "Most Votes",
+    sortNewest: "Newest",
+    searchPlaceholder: "Search nickname or character...",
+    noCosplayersFound: "No cosplayers found matching your search.",
+    clashArenaTitle: "Clash Arena",
+    placeLabel1: "1st Place",
+    placeLabel2: "2nd Place",
+    placeLabel3: "3rd Place",
 
     faqNav: "FAQ",
     rulesNav: "Rules & Terms",
@@ -446,6 +470,18 @@ export const translations: Record<Language, TranslationDictionary> = {
     firstPlacePrize: "1.000$ NAKİT ÖDÜL (1. Sıra)",
     secondPlacePrize: "250$ HEDİYE ÇEKİ (2. Sıra)",
     thirdPlacePrize: "50$ HEDİYE ÇEKİ (3. Sıra)",
+    cashLabel: "Nakit",
+    voucherLabel: "Hediye Çeki",
+    directoryTitle: "Rehber",
+    directorySubtitle: "Turnuvadaki tüm onaylı cosplayer'ları görüntüle.",
+    sortMostVotes: "En Çok Oy",
+    sortNewest: "En Yeni",
+    searchPlaceholder: "Takma ad veya karakter ara...",
+    noCosplayersFound: "Aramanızla eşleşen cosplayer bulunamadı.",
+    clashArenaTitle: "Karşılaşma Arenası",
+    placeLabel1: "1. Sıra",
+    placeLabel2: "2. Sıra",
+    placeLabel3: "3. Sıra",
 
     faqNav: "Sıkça Sorulan Sorular",
     rulesNav: "Kurallar ve Şartlar",
@@ -599,6 +635,18 @@ export const translations: Record<Language, TranslationDictionary> = {
     firstPlacePrize: "$1,000 НАЛИЧНЫМИ (1 Место)",
     secondPlacePrize: "$250 Подарочный Сертификат (2 Место)",
     thirdPlacePrize: "$50 Подарочный Сертификат (3 Место)",
+    cashLabel: "Наличными",
+    voucherLabel: "Подарочный сертификат",
+    directoryTitle: "Каталог",
+    directorySubtitle: "Все одобренные косплееры турнира.",
+    sortMostVotes: "Больше голосов",
+    sortNewest: "Новые",
+    searchPlaceholder: "Поиск по нику или персонажу...",
+    noCosplayersFound: "Косплееры по вашему запросу не найдены.",
+    clashArenaTitle: "Арена",
+    placeLabel1: "1 место",
+    placeLabel2: "2 место",
+    placeLabel3: "3 место",
 
     faqNav: "Частые Вопросы (FAQ)",
     rulesNav: "Правила и Условия",
@@ -752,6 +800,18 @@ export const translations: Record<Language, TranslationDictionary> = {
     firstPlacePrize: "$1,000 เงินสด (อันดับ 1)",
     secondPlacePrize: "$250 บัตรของขวัญ (อันดับ 2)",
     thirdPlacePrize: "$50 บัตรของขวัญ (อันดับ 3)",
+    cashLabel: "เงินสด",
+    voucherLabel: "บัตรของขวัญ",
+    directoryTitle: "ไดเรกทอรี",
+    directorySubtitle: "ดูคอสเพลเยอร์ที่ได้รับอนุมัติทั้งหมด",
+    sortMostVotes: "โหวตมากสุด",
+    sortNewest: "ใหม่ล่าสุด",
+    searchPlaceholder: "ค้นหาชื่อหรือตัวละคร...",
+    noCosplayersFound: "ไม่พบคอสเพลเยอร์ที่ตรงกับการค้นหา",
+    clashArenaTitle: "อารีน่า",
+    placeLabel1: "อันดับ 1",
+    placeLabel2: "อันดับ 2",
+    placeLabel3: "อันดับ 3",
 
     faqNav: "คำถามที่พบบ่อย",
     rulesNav: "กติกาและเงื่อนไข",
@@ -905,6 +965,18 @@ export const translations: Record<Language, TranslationDictionary> = {
     firstPlacePrize: "$1,000 キャッシュ (1位)",
     secondPlacePrize: "$250 ギフト券 (2位)",
     thirdPlacePrize: "$50 ギフト券 (3位)",
+    cashLabel: "現金",
+    voucherLabel: "ギフト券",
+    directoryTitle: "ディレクトリ",
+    directorySubtitle: "承認済みの全コスプレイヤーを表示",
+    sortMostVotes: "得票順",
+    sortNewest: "新着",
+    searchPlaceholder: "ニックネームやキャラで検索...",
+    noCosplayersFound: "該当するコスプレイヤーが見つかりません。",
+    clashArenaTitle: "アリーナ",
+    placeLabel1: "1位",
+    placeLabel2: "2位",
+    placeLabel3: "3位",
 
     faqNav: "よくある質問 (FAQ)",
     rulesNav: "利用規約・ルール",
@@ -1058,6 +1130,18 @@ export const translations: Record<Language, TranslationDictionary> = {
     firstPlacePrize: "$1,000 现金大奖 (第 1 名)",
     secondPlacePrize: "$250 礼品卡 (第 2 名)",
     thirdPlacePrize: "$50 礼品卡 (第 3 名)",
+    cashLabel: "现金",
+    voucherLabel: "礼品卡",
+    directoryTitle: "图鉴",
+    directorySubtitle: "浏览所有已通过的 Cosplayer",
+    sortMostVotes: "票数最多",
+    sortNewest: "最新",
+    searchPlaceholder: "搜索昵称或角色...",
+    noCosplayersFound: "没有找到匹配的 Cosplayer。",
+    clashArenaTitle: "对战竞技场",
+    placeLabel1: "第1名",
+    placeLabel2: "第2名",
+    placeLabel3: "第3名",
 
     faqNav: "常见问题",
     rulesNav: "规则与条款",
@@ -1211,6 +1295,18 @@ export const translations: Record<Language, TranslationDictionary> = {
     firstPlacePrize: "$1,000 현금 (1위)",
     secondPlacePrize: "$250 기프트카드 (2위)",
     thirdPlacePrize: "$50 기프트카드 (3위)",
+    cashLabel: "현금",
+    voucherLabel: "기프트카드",
+    directoryTitle: "디렉터리",
+    directorySubtitle: "승인된 모든 코스플레이어 보기",
+    sortMostVotes: "득표순",
+    sortNewest: "최신",
+    searchPlaceholder: "닉네임 또는 캐릭터 검색...",
+    noCosplayersFound: "검색과 일치하는 코스플레이어가 없습니다.",
+    clashArenaTitle: "클래시 아레나",
+    placeLabel1: "1위",
+    placeLabel2: "2위",
+    placeLabel3: "3위",
 
     faqNav: "자주 묻는 질문",
     rulesNav: "규정 및 약관",
