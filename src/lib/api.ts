@@ -545,11 +545,19 @@ export async function castVoteApi(contestantId: string, isSuperVote: boolean, fi
   if (isSupabaseConfigured && supabase) {
     // Production: secure RPC (limits + credit consume in DB)
     try {
+      let voterIp = unlimited ? 'test_unlimited' : 'client_app';
+      if (!unlimited) {
+        try {
+          const ipRes = await fetch('/api/client-ip');
+          const ipJson = await ipRes.json();
+          if (ipJson?.ip) voterIp = String(ipJson.ip).slice(0, 64);
+        } catch (_) {}
+      }
       const { data: secureData, error: secureErr } = await supabase.rpc('cast_vote_secure', {
         p_contestant_id: contestantId,
         p_is_super: isSuperVote,
         p_fingerprint: fingerprintHash || 'sqfp_default',
-        p_voter_ip: unlimited ? 'test_unlimited' : 'client_app',
+        p_voter_ip: voterIp,
       });
       if (!secureErr && secureData) {
         const d = secureData as any;
