@@ -58,10 +58,10 @@ export const ContestantsGrid: React.FC<ContestantsGridProps> = ({
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
           <h2 className="text-3xl font-black text-white italic tracking-tight uppercase">
-            SpiderQueens <span className="text-pink-500">Directory</span>
+            SpiderQueens <span className="text-pink-500">{t.directoryTitle}</span>
           </h2>
           <p className="text-xs text-gray-400 mt-1">
-            Browse all approved cosplayers competing in the tournament.
+            {t.directorySubtitle}
           </p>
         </div>
 
@@ -74,7 +74,7 @@ export const ContestantsGrid: React.FC<ContestantsGridProps> = ({
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search nickname or character..."
+              placeholder={t.searchPlaceholder}
               className="w-full pl-9 pr-4 py-2 rounded-xl bg-[#0F0F12] border border-white/10 focus:border-pink-500 text-white text-xs outline-none transition-colors"
             />
           </div>
@@ -87,7 +87,7 @@ export const ContestantsGrid: React.FC<ContestantsGridProps> = ({
                 sortBy === 'votes' ? 'bg-pink-500/20 text-pink-400 border border-pink-500/30' : 'text-gray-400 hover:text-white'
               }`}
             >
-              Most Votes
+              {t.sortMostVotes}
             </button>
             <button
               onClick={() => setSortBy('newest')}
@@ -95,7 +95,7 @@ export const ContestantsGrid: React.FC<ContestantsGridProps> = ({
                 sortBy === 'newest' ? 'bg-pink-500/20 text-pink-400 border border-pink-500/30' : 'text-gray-400 hover:text-white'
               }`}
             >
-              Newest
+              {t.sortNewest}
             </button>
           </div>
         </div>
@@ -104,7 +104,7 @@ export const ContestantsGrid: React.FC<ContestantsGridProps> = ({
       {/* Grid */}
       {filtered.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
-          <p className="text-base font-semibold">No cosplayers found matching your search.</p>
+          <p className="text-base font-semibold">{t.noCosplayersFound}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
