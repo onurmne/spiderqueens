@@ -118,7 +118,11 @@ export default function App() {
         fetchData();
         window.history.replaceState({}, '', window.location.pathname);
       } else if (payment === 'failed') {
-        alert('Ödeme tamamlanamadı veya iptal edildi.');
+        const reason = q.get('reason') || '';
+        alert(
+          'Ödeme tamamlanamadı veya iptal edildi.' +
+            (reason ? '\nDetay: ' + reason : '')
+        );
         window.history.replaceState({}, '', window.location.pathname);
       }
     } catch (e) {}
