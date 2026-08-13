@@ -179,7 +179,7 @@ export const JoinTab: React.FC<JoinTabProps> = ({ t, onSubmitApplication }) => {
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider">
-                Cosplay Fotoğrafı *
+                {t.photoLabel}
               </label>
               
               {/* Toggle upload mode */}
@@ -194,7 +194,7 @@ export const JoinTab: React.FC<JoinTabProps> = ({ t, onSubmitApplication }) => {
                   }`}
                 >
                   <Upload className="w-3 h-3" />
-                  <span>Dosya Yükle</span>
+                  <span>{t.photoUploadFile}</span>
                 </button>
                 <button
                   type="button"
@@ -206,7 +206,7 @@ export const JoinTab: React.FC<JoinTabProps> = ({ t, onSubmitApplication }) => {
                   }`}
                 >
                   <LinkIcon className="w-3 h-3" />
-                  <span>Instagram / Link</span>
+                  <span>{t.photoUploadLink}</span>
                 </button>
               </div>
             </div>
@@ -225,10 +225,10 @@ export const JoinTab: React.FC<JoinTabProps> = ({ t, onSubmitApplication }) => {
                   </div>
                   <div>
                     <span className="text-xs font-bold text-white block">
-                      Fotoğrafınızı buraya sürükleyin veya tıklayıp seçin
+                      {t.photoDropHint}
                     </span>
                     <span className="text-[10px] text-gray-400 block mt-0.5">
-                      PNG, JPG, WEBP (Maksimum 5MB)
+                      {t.photoFormats}
                     </span>
                   </div>
                 </div>
@@ -241,7 +241,7 @@ export const JoinTab: React.FC<JoinTabProps> = ({ t, onSubmitApplication }) => {
                   required
                   value={formData.photo_url}
                   onChange={(e) => setFormData({ ...formData, photo_url: e.target.value })}
-                  placeholder="https://instagram.com/p/... veya fotoğraf URL adresi yapıştırın"
+                  placeholder={t.photoUrlPlaceholder}
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#151518] border border-white/10 focus:border-pink-500 text-white text-xs outline-none transition-colors"
                 />
               </div>
@@ -249,7 +249,7 @@ export const JoinTab: React.FC<JoinTabProps> = ({ t, onSubmitApplication }) => {
 
             {/* Quick Preset Selector */}
             <div className="flex flex-wrap items-center gap-2 mt-3">
-              <span className="text-[11px] text-gray-400 font-semibold">Örnek görseller:</span>
+              <span className="text-[11px] text-gray-400 font-semibold">{t.photoExamples}</span>
               {PRESET_PHOTOS.map((preset, idx) => (
                 <button
                   type="button"
