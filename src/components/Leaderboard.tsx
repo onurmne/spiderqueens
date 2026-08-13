@@ -2,13 +2,20 @@ import React from 'react';
 import { Contestant } from '../types';
 import { TranslationDictionary } from '../i18n/translations';
 import { Crown, Trophy, Medal, Heart, Instagram, ExternalLink, Sparkles } from 'lucide-react';
+import { RewardSettings, formatPrizeUsd, DEFAULT_REWARD_SETTINGS } from '../lib/api';
 
 interface LeaderboardProps {
   t: TranslationDictionary;
   contestants: Contestant[];
+  rewardSettings?: RewardSettings;
 }
 
-export const Leaderboard: React.FC<LeaderboardProps> = ({ t, contestants }) => {
+export const Leaderboard: React.FC<LeaderboardProps> = ({ t, contestants, rewardSettings }) => {
+  const rs = rewardSettings || DEFAULT_REWARD_SETTINGS;
+  const firstPrize = formatPrizeUsd(rs.first_place_prize_usd || rs.base_first_prize);
+  const secondPrize = formatPrizeUsd(rs.base_second_prize);
+  const thirdPrize = formatPrizeUsd(rs.base_third_prize);
+
   const topQueens = contestants
     .filter((c) => c.status === 'approved')
     .sort((a, b) => b.votes_count - a.votes_count)
@@ -74,14 +81,14 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ t, contestants }) => {
               <Heart className="w-3.5 h-3.5 text-pink-500 fill-pink-500" />
               <span>{topQueens[1].votes_count} {t.votes}</span>
             </div>
-            <span className="text-[11px] font-bold text-gray-400 mt-2">Prize: $200 Gift Voucher</span>
+            <span className="text-[11px] font-bold text-gray-400 mt-2">{t.prizeLabel}: {secondPrize} {t.voucherLabel}</span>
           </div>
 
           {/* 1st Place - Gold Crown */}
           <div className="order-1 md:order-2 bg-[#151518] rounded-2xl border-2 border-yellow-500/60 p-6 flex flex-col items-center text-center shadow-2xl relative overflow-hidden scale-105">
             <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-yellow-500" />
             <div className="absolute top-3 right-3 bg-yellow-500/20 text-yellow-400 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border border-yellow-500/40">
-              Grand Winner
+              {t.grandWinner}
             </div>
             <div className="relative mb-3 mt-2">
               <img
@@ -103,7 +110,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ t, contestants }) => {
               <span>{topQueens[0].votes_count} {t.votes}</span>
             </div>
             <span className="text-xs font-black text-yellow-400 mt-2 bg-yellow-500/10 px-3 py-1 rounded-full border border-yellow-500/30">
-              Prize: $1,000 CASH
+              {t.prizeLabel}: {firstPrize} {t.cashLabel}
             </span>
           </div>
 
@@ -126,7 +133,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ t, contestants }) => {
               <Heart className="w-3.5 h-3.5 text-pink-500 fill-pink-500" />
               <span>{topQueens[2].votes_count} {t.votes}</span>
             </div>
-            <span className="text-[11px] font-bold text-gray-400 mt-2">Prize: $50 Gift Voucher</span>
+            <span className="text-[11px] font-bold text-gray-400 mt-2">{t.prizeLabel}: {thirdPrize} {t.voucherLabel}</span>
           </div>
 
         </div>
