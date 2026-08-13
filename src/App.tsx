@@ -277,7 +277,7 @@ export default function App() {
             )}
 
             {activeTab === 'leaderboard' && (
-              <Leaderboard t={t} contestants={contestants} />
+              <Leaderboard t={t} contestants={contestants} rewardSettings={rewardSettings} />
             )}
 
             {activeTab === 'browse' && (
@@ -412,6 +412,7 @@ export default function App() {
         t={t}
         type={infoModalType}
         onClose={() => setInfoModalType(null)}
+        rewardSettings={rewardSettings}
       />
 
       {/* Footer */}
