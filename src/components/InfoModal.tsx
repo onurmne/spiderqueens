@@ -1,17 +1,29 @@
 import React from 'react';
 import { TranslationDictionary } from '../i18n/translations';
 import { X, HelpCircle, ShieldCheck, FileText, ChevronRight } from 'lucide-react';
+import { RewardSettings, formatPrizeUsd, DEFAULT_REWARD_SETTINGS } from '../lib/api';
 
 interface InfoModalProps {
   t: TranslationDictionary;
   type: 'faq' | 'rules' | 'privacy' | null;
   onClose: () => void;
+  rewardSettings?: RewardSettings;
 }
 
-export const InfoModal: React.FC<InfoModalProps> = ({ t, type, onClose }) => {
+export const InfoModal: React.FC<InfoModalProps> = ({ t, type, onClose, rewardSettings }) => {
   if (!type) return null;
 
+  const rs = rewardSettings || DEFAULT_REWARD_SETTINGS;
+  const first = `${formatPrizeUsd(rs.first_place_prize_usd || rs.base_first_prize)} ${t.cashLabel}`;
+  const second = `${formatPrizeUsd(rs.base_second_prize)} ${t.voucherLabel}`;
+  const third = `${formatPrizeUsd(rs.base_third_prize)} ${t.voucherLabel}`;
+  const faqA2Text = (t.faqA2Dynamic || t.faqA2)
+    .replace('{first}', first)
+    .replace('{second}', second)
+    .replace('{third}', third);
+
   return (
+
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
       <div className="relative w-full max-w-2xl max-h-[85vh] bg-[#0F0F12] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl overflow-y-auto">
         
@@ -55,7 +67,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({ t, type, onClose }) => {
                   <span>{t.faqQ2}</span>
                 </h4>
                 <p className="text-gray-300 leading-relaxed pl-6">
-                  {t.faqA2}
+                  {faqA2Text}
                 </p>
               </div>
 
