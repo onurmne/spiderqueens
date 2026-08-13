@@ -16,11 +16,18 @@ interface StoreModalProps {
   }) => Promise<{ status?: string; super_votes_credit?: number } | void>;
 }
 
+// votes = hesaba yüklenecek TOPLAM Super Vote (base + bonus dahil)
 const PACKAGES: SuperVotePackage[] = [
-  { id: 'pkg_1', name: 'Starter Pack', votes: 10, price: 4.99 },
-  { id: 'pkg_2', name: 'Champion Pack', votes: 50, price: 19.99, popular: true, bonus: '+10 Bonus' },
-  { id: 'pkg_3', name: 'Queen Maker', votes: 150, price: 49.99, bonus: '+30 Bonus' },
+  { id: 'pkg_1', name: 'Starter Pack', votes: 10, bonusVotes: 0, price: 4.99 },
+  { id: 'pkg_2', name: 'Champion Pack', votes: 60, bonusVotes: 10, price: 19.99, popular: true, bonus: '+10 Bonus (50+10)' },
+  { id: 'pkg_3', name: 'Queen Maker', votes: 180, bonusVotes: 30, price: 49.99, bonus: '+30 Bonus (150+30)' },
 ];
+
+/** Toplam kredi — votes zaten total; bonusVotes varsa çift sayma yok */
+function packageTotalVotes(pkg: SuperVotePackage): number {
+  // votes alanı TOPLAM olarak tutulur (60, 180). bonusVotes sadece etiket içindir.
+  return Number(pkg.votes) || 0;
+}
 
 const WALLETS: Record<CryptoAsset, string> = {
   USDT_TRC20: 'TKZnN4u5L11Da5W8svvV1SnVuQRe6bKaqt',
@@ -47,6 +54,17 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   });
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [usdTryRate, setUsdTryRate] = useState<number | null>(null);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    fetch('/api/iyzico/rate')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.rate) setUsdTryRate(Number(d.rate));
+      })
+      .catch(() => setUsdTryRate(34));
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -55,6 +73,11 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const approxTry =
+    usdTryRate && selectedPkg
+      ? (selectedPkg.price * usdTryRate).toFixed(2)
+      : null;
 
   const handleProcessPayment = async () => {
     if (paymentMethod === 'crypto_manual' && !txHash) {
@@ -66,7 +89,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     try {
       const result = await onPurchase({
         amount: selectedPkg.price,
-        super_votes_amount: selectedPkg.votes,
+        super_votes_amount: packageTotalVotes(selectedPkg),
         payment_method: paymentMethod,
         tx_hash_or_note: txHash,
         crypto_asset: paymentMethod === 'crypto_manual' ? cryptoAsset : undefined,
@@ -152,7 +175,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                   <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">{pkg.name}</h4>
                   <div className="text-2xl font-black text-white mt-1 flex items-center gap-1 font-mono">
                     <Zap className="w-5 h-5 text-amber-400 fill-amber-400" />
-                    <span>{pkg.votes}</span>
+                    <span>{packageTotalVotes(pkg)}</span>
                   </div>
                   <span className="text-[11px] text-pink-400 font-semibold">{pkg.bonus}</span>
                 </div>
@@ -303,7 +326,13 @@ export const StoreModal: React.FC<StoreModalProps> = ({
           disabled={loading}
           className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-pink-600 to-purple-700 hover:brightness-110 text-white font-black text-xs uppercase tracking-wider shadow-xl transition-all cursor-pointer disabled:opacity-50"
         >
-          {loading ? 'Processing...' : `${t.payNow} ($${selectedPkg.price})`}
+          {paymentMethod === 'credit_card' && approxTry && (
+          <p className="text-[11px] text-amber-300/90 text-center mb-2">
+            Kart ile tahsilat: <strong>≈ {approxTry} TL</strong>
+            <span className="text-gray-500"> (paket ${selectedPkg.price} × kur)</span>
+          </p>
+        )}
+        {loading ? 'Processing...' : `${t.payNow} ($${selectedPkg.price})`}
         </button>
 
       </div>
