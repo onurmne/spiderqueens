@@ -14,6 +14,8 @@ interface StoreModalProps {
     tx_hash_or_note?: string;
     crypto_asset?: CryptoAsset;
   }) => Promise<{ status?: string; super_votes_credit?: number } | void>;
+  creditCardEnabled?: boolean;
+  cryptoEnabled?: boolean;
 }
 
 // votes = hesaba yüklenecek TOPLAM Super Vote (base + bonus dahil)
@@ -40,9 +42,12 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   isOpen,
   onClose,
   onPurchase,
+  creditCardEnabled = false,
+  cryptoEnabled = true,
 }) => {
   const [selectedPkg, setSelectedPkg] = useState<SuperVotePackage>(PACKAGES[1]);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('credit_card');
+  const defaultMethod: PaymentMethod = creditCardEnabled ? 'credit_card' : 'crypto_manual';
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(defaultMethod);
   const [cryptoAsset, setCryptoAsset] = useState<CryptoAsset>('USDT_TRC20');
   const [copied, setCopied] = useState(false);
   const [txHash, setTxHash] = useState('');
@@ -66,7 +71,27 @@ export const StoreModal: React.FC<StoreModalProps> = ({
       .catch(() => setUsdTryRate(34));
   }, [isOpen]);
 
+  React.useEffect(() => {
+    if (!creditCardEnabled && paymentMethod === 'credit_card') {
+      setPaymentMethod('crypto_manual');
+    }
+    if (!cryptoEnabled && paymentMethod === 'crypto_manual' && creditCardEnabled) {
+      setPaymentMethod('credit_card');
+    }
+  }, [creditCardEnabled, cryptoEnabled, paymentMethod]);
+
   if (!isOpen) return null;
+
+  if (!creditCardEnabled && !cryptoEnabled) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+        <div className="relative w-full max-w-md bg-[#0F0F12] border border-white/10 rounded-3xl p-8 text-center">
+          <p className="text-white font-bold mb-4">Super Vote satışları şu an kapalı.</p>
+          <button type="button" onClick={onClose} className="px-6 py-2 rounded-xl bg-pink-500 text-white font-bold cursor-pointer">OK</button>
+        </div>
+      </div>
+    );
+  }
 
   const handleCopyWallet = () => {
     navigator.clipboard.writeText(WALLETS[cryptoAsset]);
@@ -80,6 +105,14 @@ export const StoreModal: React.FC<StoreModalProps> = ({
       : null;
 
   const handleProcessPayment = async () => {
+    if (paymentMethod === 'credit_card' && !creditCardEnabled) {
+      alert('Kredi kartı ödemesi şu an kapalı.');
+      return;
+    }
+    if (paymentMethod === 'crypto_manual' && !cryptoEnabled) {
+      alert('Kripto ödemesi şu an kapalı.');
+      return;
+    }
     if (paymentMethod === 'crypto_manual' && !txHash) {
       alert('Please enter your Transaction Hash or note.');
       return;
@@ -188,40 +221,50 @@ export const StoreModal: React.FC<StoreModalProps> = ({
           })}
         </div>
 
-        {/* Payment Method Selector */}
+        {/* Payment Method Selector — kapalı kanallar tamamen gizlenir */}
         <div className="mb-6">
           <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
             Select Payment Method
           </label>
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={() => setPaymentMethod('credit_card')}
-              className={`p-3 rounded-2xl border flex items-center justify-center gap-2 text-xs font-bold transition-all cursor-pointer ${
-                paymentMethod === 'credit_card'
-                  ? 'bg-pink-500/20 border-pink-500 text-white'
-                  : 'bg-[#151518] border-white/10 text-gray-400 hover:text-white'
-              }`}
-            >
-              <CreditCard className="w-4 h-4 text-pink-400" />
-              <span>{t.payCreditCard}</span>
-            </button>
-
-            <button
-              onClick={() => setPaymentMethod('crypto_manual')}
-              className={`p-3 rounded-2xl border flex items-center justify-center gap-2 text-xs font-bold transition-all cursor-pointer ${
-                paymentMethod === 'crypto_manual'
-                  ? 'bg-purple-500/20 border-purple-500 text-white'
-                  : 'bg-[#151518] border-white/10 text-gray-400 hover:text-white'
-              }`}
-            >
-              <Wallet className="w-4 h-4 text-purple-400" />
-              <span>{t.payCrypto}</span>
-            </button>
+          <div className={`grid gap-3 ${creditCardEnabled && cryptoEnabled ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            {creditCardEnabled && (
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('credit_card')}
+                className={`p-3 rounded-2xl border flex items-center justify-center gap-2 text-xs font-bold transition-all cursor-pointer ${
+                  paymentMethod === 'credit_card'
+                    ? 'bg-pink-500/20 border-pink-500 text-white'
+                    : 'bg-[#151518] border-white/10 text-gray-400 hover:text-white'
+                }`}
+              >
+                <CreditCard className="w-4 h-4 text-pink-400" />
+                <span>{t.payCreditCard}</span>
+              </button>
+            )}
+            {cryptoEnabled && (
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('crypto_manual')}
+                className={`p-3 rounded-2xl border flex items-center justify-center gap-2 text-xs font-bold transition-all cursor-pointer ${
+                  paymentMethod === 'crypto_manual'
+                    ? 'bg-purple-500/20 border-purple-500 text-white'
+                    : 'bg-[#151518] border-white/10 text-gray-400 hover:text-white'
+                }`}
+              >
+                <Wallet className="w-4 h-4 text-purple-400" />
+                <span>{t.payCrypto}</span>
+              </button>
+            )}
           </div>
+          {!creditCardEnabled && cryptoEnabled && (
+            <p className="mt-2 text-[11px] text-amber-300/90 font-semibold">
+              Kredi kartı (iyzico) Eylül’de açılacak. Şimdilik kripto ile Super Vote alabilirsin.
+            </p>
+          )}
         </div>
 
         {/* Payment Form Fields */}
-        {paymentMethod === 'credit_card' ? (
+        {paymentMethod === 'credit_card' && creditCardEnabled ? (
           <div className="bg-[#151518] p-4 rounded-2xl border border-white/10 space-y-3 mb-6">
             <div>
               <label className="block text-[11px] font-bold text-gray-400 uppercase mb-1">
