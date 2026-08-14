@@ -1080,6 +1080,17 @@ export async function fetchAdminPendingApi(): Promise<{
 }
 
 // ---------- Reward Settings (live prize pool) ----------
+export type SiteAnnouncementMap = {
+  en?: string;
+  tr?: string;
+  ru?: string;
+  th?: string;
+  ja?: string;
+  zh?: string;
+  ko?: string;
+  [key: string]: string | undefined;
+};
+
 export type RewardSettings = {
   pool_contribution_percentage: number;
   base_first_prize: number;
@@ -1087,6 +1098,21 @@ export type RewardSettings = {
   base_third_prize: number;
   accumulated_pool_usd: number;
   first_place_prize_usd: number;
+  /** Kredi kartı / iyzico satışı (Eylül'de aç) — iyzico kodu bozulmaz */
+  credit_card_sales_enabled: boolean;
+  /** Kripto satışı (şimdi açık olabilir) */
+  crypto_sales_enabled: boolean;
+  site_announcement: SiteAnnouncementMap;
+};
+
+export const DEFAULT_SITE_ANNOUNCEMENT: SiteAnnouncementMap = {
+  "tr": "🔥 Eylül başında resmen başlıyoruz! Şimdilik günlük ücretsiz oylarla favori cosplayer'ını destekle — her oy ödül havuzunu büyütüyor. Super Vote satışları ve büyük yarış Eylül'de açılacak. Erken katıl, liderlik tablosunda yerini al!",
+  "en": "🔥 We officially launch in early September! For now, support your favorite cosplayer with free daily votes — every vote grows the prize pool. Super Vote sales and the full championship open in September. Join early and claim your spot on the leaderboard!",
+  "ru": "🔥 Официальный старт в начале сентября! Пока поддерживайте любимого косплеера бесплатными ежедневными голосами — каждый голос увеличивает призовой фонд. Продажа Super Vote и полный чемпионат откроются в сентябре. Присоединяйтесь раньше и займите место в таблице лидеров!",
+  "th": "🔥 เปิดอย่างเป็นทางการต้นเดือนกันยายน! ตอนนี้สนับสนุนคอสเพลเยอร์ที่ชอบด้วยโหวตฟรีรายวัน — ทุกโหวตช่วยเพิ่มเงินรางวัล Super Vote และการแข่งขันเต็มรูปแบบเปิดในเดือนกันยายน เข้าร่วมก่อนและคว้าอันดับบนกระดานผู้นำ!",
+  "ja": "🔥 9月上旬に正式スタート！今は毎日の無料投票で推しコスプレイヤーを応援 — 1票ごとに賞金プールが成長します。Super Vote販売と本戦は9月解禁。早めに参加してリーダーボードの席を確保しよう！",
+  "zh": "🔥 9月初正式开赛！现在用每日免费票支持你喜爱的 Cosplayer——每票都在扩大奖池。Super Vote 销售与完整锦标赛将在9月开启。提前加入，占领排行榜席位！",
+  "ko": "🔥 9월 초에 정식 시작합니다! 지금은 매일 무료 투표로 최애 코스플레이어를 응원하세요 — 표가 쌓일수록 상금 풀이 커집니다. Super Vote 판매와 본 대회는 9월에 오픈. 일찍 참여해 리더보드 자리를 확보하세요!"
 };
 
 export const DEFAULT_REWARD_SETTINGS: RewardSettings = {
@@ -1096,7 +1122,26 @@ export const DEFAULT_REWARD_SETTINGS: RewardSettings = {
   base_third_prize: 50,
   accumulated_pool_usd: 0,
   first_place_prize_usd: 1000,
+  credit_card_sales_enabled: false,
+  crypto_sales_enabled: true,
+  site_announcement: { ...DEFAULT_SITE_ANNOUNCEMENT },
 };
+
+function parseAnnouncement(raw: unknown): SiteAnnouncementMap {
+  if (!raw) return { ...DEFAULT_SITE_ANNOUNCEMENT };
+  if (typeof raw === 'string') {
+    try {
+      const j = JSON.parse(raw);
+      return { ...DEFAULT_SITE_ANNOUNCEMENT, ...j };
+    } catch {
+      return { ...DEFAULT_SITE_ANNOUNCEMENT, tr: raw, en: raw };
+    }
+  }
+  if (typeof raw === 'object') {
+    return { ...DEFAULT_SITE_ANNOUNCEMENT, ...(raw as SiteAnnouncementMap) };
+  }
+  return { ...DEFAULT_SITE_ANNOUNCEMENT };
+}
 
 export function formatPrizeUsd(amount: number): string {
   const n = Number(amount) || 0;
@@ -1121,6 +1166,9 @@ export async function fetchSettingsApi(): Promise<RewardSettings> {
           base_third_prize: Number(data.base_third_prize) || 50,
           accumulated_pool_usd: pool,
           first_place_prize_usd: base1 + pool,
+          credit_card_sales_enabled: data.credit_card_sales_enabled === true,
+          crypto_sales_enabled: data.crypto_sales_enabled !== false,
+          site_announcement: parseAnnouncement(data.site_announcement),
         };
       }
     } catch (e) {
@@ -1140,6 +1188,9 @@ export async function fetchSettingsApi(): Promise<RewardSettings> {
       base_third_prize: Number(d.base_third_prize) || 50,
       accumulated_pool_usd: pool,
       first_place_prize_usd: Number(d.first_place_prize_usd) || base1 + pool,
+      credit_card_sales_enabled: d.credit_card_sales_enabled === true,
+      crypto_sales_enabled: d.crypto_sales_enabled !== false,
+      site_announcement: parseAnnouncement(d.site_announcement),
     };
   }
 
@@ -1151,9 +1202,12 @@ export async function saveSettingsApi(input: {
   base_first_prize: number;
   base_second_prize: number;
   base_third_prize: number;
+  credit_card_sales_enabled?: boolean;
+  crypto_sales_enabled?: boolean;
+  site_announcement?: SiteAnnouncementMap;
 }): Promise<RewardSettings> {
   if (isSupabaseConfigured && supabase) {
-    const payload = {
+    const payload: Record<string, unknown> = {
       id: 1,
       pool_contribution_percentage: input.pool_contribution_percentage,
       base_first_prize: input.base_first_prize,
@@ -1161,6 +1215,15 @@ export async function saveSettingsApi(input: {
       base_third_prize: input.base_third_prize,
       updated_at: new Date().toISOString(),
     };
+    if (typeof input.credit_card_sales_enabled === 'boolean') {
+      payload.credit_card_sales_enabled = input.credit_card_sales_enabled;
+    }
+    if (typeof input.crypto_sales_enabled === 'boolean') {
+      payload.crypto_sales_enabled = input.crypto_sales_enabled;
+    }
+    if (input.site_announcement) {
+      payload.site_announcement = input.site_announcement;
+    }
 
     const { data, error } = await supabase
       .from('settings')
@@ -1182,6 +1245,9 @@ export async function saveSettingsApi(input: {
       base_third_prize: Number(data?.base_third_prize ?? input.base_third_prize),
       accumulated_pool_usd: pool,
       first_place_prize_usd: base1 + pool,
+      credit_card_sales_enabled: data?.credit_card_sales_enabled === true,
+      crypto_sales_enabled: data?.crypto_sales_enabled !== false,
+      site_announcement: parseAnnouncement(data?.site_announcement ?? input.site_announcement),
     };
   }
 
@@ -1199,5 +1265,8 @@ export async function saveSettingsApi(input: {
     ...input,
     accumulated_pool_usd: 0,
     first_place_prize_usd: input.base_first_prize,
+    credit_card_sales_enabled: input.credit_card_sales_enabled === true,
+    crypto_sales_enabled: input.crypto_sales_enabled !== false,
+    site_announcement: input.site_announcement || { ...DEFAULT_SITE_ANNOUNCEMENT },
   };
 }
