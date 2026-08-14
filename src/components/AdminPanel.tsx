@@ -31,6 +31,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ t, onAdminAction, onSett
     base_third_prize: 50,
     accumulated_pool_usd: 185.50,
     first_place_prize_usd: 1185.50,
+    credit_card_sales_enabled: false,
+    crypto_sales_enabled: true,
+    site_announcement: {
+      tr: '', en: '', ru: '', th: '', ja: '', zh: '', ko: '',
+    } as Record<string, string>,
   });
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
@@ -78,6 +83,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ t, onAdminAction, onSett
             base_third_prize: settingsData.base_third_prize,
             accumulated_pool_usd: settingsData.accumulated_pool_usd,
             first_place_prize_usd: settingsData.first_place_prize_usd,
+            credit_card_sales_enabled: settingsData.credit_card_sales_enabled === true,
+            crypto_sales_enabled: settingsData.crypto_sales_enabled !== false,
+            site_announcement: {
+              tr: settingsData.site_announcement?.tr || '',
+              en: settingsData.site_announcement?.en || '',
+              ru: settingsData.site_announcement?.ru || '',
+              th: settingsData.site_announcement?.th || '',
+              ja: settingsData.site_announcement?.ja || '',
+              zh: settingsData.site_announcement?.zh || '',
+              ko: settingsData.site_announcement?.ko || '',
+            },
           });
         }
       } catch (e) {}
@@ -110,6 +126,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ t, onAdminAction, onSett
         base_first_prize: Number(settings.base_first_prize),
         base_second_prize: Number(settings.base_second_prize),
         base_third_prize: Number(settings.base_third_prize),
+        credit_card_sales_enabled: settings.credit_card_sales_enabled === true,
+        crypto_sales_enabled: settings.crypto_sales_enabled !== false,
+        site_announcement: settings.site_announcement,
       });
       setSettings({
         pool_contribution_percentage: saved.pool_contribution_percentage,
@@ -118,6 +137,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ t, onAdminAction, onSett
         base_third_prize: saved.base_third_prize,
         accumulated_pool_usd: saved.accumulated_pool_usd,
         first_place_prize_usd: saved.first_place_prize_usd,
+        credit_card_sales_enabled: saved.credit_card_sales_enabled === true,
+        crypto_sales_enabled: saved.crypto_sales_enabled !== false,
+        site_announcement: {
+          tr: saved.site_announcement?.tr || '',
+          en: saved.site_announcement?.en || '',
+          ru: saved.site_announcement?.ru || '',
+          th: saved.site_announcement?.th || '',
+          ja: saved.site_announcement?.ja || '',
+          zh: saved.site_announcement?.zh || '',
+          ko: saved.site_announcement?.ko || '',
+        },
       });
       onSettingsSaved?.(saved);
       setSettingsSaved(true);
@@ -528,6 +558,55 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ t, onAdminAction, onSett
                   className="w-full bg-[#0F0F12] border border-white/20 rounded-xl px-4 py-2.5 text-white font-mono text-sm focus:outline-none focus:border-pink-500"
                 />
               </div>
+            </div>
+
+            {/* Satış kanalları — iyzico koduna dokunulmaz */}
+            <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 space-y-3">
+              <h5 className="text-xs font-black text-amber-400 uppercase tracking-wider">Super Vote satış kanalları</h5>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={settings.credit_card_sales_enabled === true}
+                  onChange={(e) => setSettings({ ...settings, credit_card_sales_enabled: e.target.checked })}
+                  className="w-4 h-4 accent-pink-500"
+                />
+                <span className="text-sm font-bold text-white">Kredi kartı (iyzico) — Eylül’de aç</span>
+              </label>
+              <p className="text-[11px] text-gray-400 pl-7">
+                Kapalıyken sitede kredi kartı seçeneği görünmez ve işlem başlatılamaz. iyzico altyapısı bozulmaz.
+              </p>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={settings.crypto_sales_enabled !== false}
+                  onChange={(e) => setSettings({ ...settings, crypto_sales_enabled: e.target.checked })}
+                  className="w-4 h-4 accent-pink-500"
+                />
+                <span className="text-sm font-bold text-white">Kripto ile Super Vote</span>
+              </label>
+              <p className="text-[11px] text-gray-400 pl-7">
+                Açıkken mağazadan kripto ödeme alınır (admin onayı gerekir). Talebe göre kapatıp açabilirsin.
+              </p>
+            </div>
+
+            {/* Duyuru panosu — 7 dil */}
+            <div className="space-y-3 p-4 rounded-xl border border-pink-500/20 bg-pink-500/5">
+              <h5 className="text-xs font-black text-pink-400 uppercase tracking-wider">Ana sayfa duyuru panosu (dile göre)</h5>
+              <p className="text-[11px] text-gray-400">Kullanıcının seçtiği dildeki metin gösterilir. Her dili ayrı düzenleyebilirsin.</p>
+              {(['tr','en','ru','th','ja','zh','ko'] as const).map((lang) => (
+                <div key={lang}>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{lang}</label>
+                  <textarea
+                    rows={2}
+                    value={settings.site_announcement?.[lang] || ''}
+                    onChange={(e) => setSettings({
+                      ...settings,
+                      site_announcement: { ...settings.site_announcement, [lang]: e.target.value },
+                    })}
+                    className="w-full bg-[#0F0F12] border border-white/20 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-pink-500"
+                  />
+                </div>
+              ))}
             </div>
 
             <div className="pt-2 flex items-center justify-between">
