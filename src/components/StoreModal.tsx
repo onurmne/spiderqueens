@@ -33,8 +33,6 @@ function packageTotalVotes(pkg: SuperVotePackage): number {
 
 const WALLETS: Record<CryptoAsset, string> = {
   USDT_TRC20: 'TKZnN4u5L11Da5W8svvV1SnVuQRe6bKaqt',
-  BTC: '1Sp1derQu33nsBTC2026S3cur3W4ll3tAdr3ss',
-  ETH: '0xSp1derQu33nsETH2026S3cur3W4ll3tAdr3ss',
 };
 
 export const StoreModal: React.FC<StoreModalProps> = ({
@@ -304,26 +302,13 @@ export const StoreModal: React.FC<StoreModalProps> = ({
           </div>
         ) : (
           <div className="bg-[#151518] p-4 rounded-2xl border border-white/10 space-y-4 mb-6">
-            {/* Crypto Asset Selector */}
+            {/* Sadece USDT TRC20 */}
             <div>
               <label className="block text-[11px] font-bold text-gray-400 uppercase mb-1.5">
                 {t.selectCrypto}
               </label>
-              <div className="flex gap-2">
-                {(['USDT_TRC20', 'BTC', 'ETH'] as CryptoAsset[]).map((asset) => (
-                  <button
-                    key={asset}
-                    type="button"
-                    onClick={() => setCryptoAsset(asset)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer ${
-                      cryptoAsset === asset
-                        ? 'bg-amber-500/20 border-amber-500 text-amber-300'
-                        : 'bg-[#0F0F12] border-white/10 text-gray-400'
-                    }`}
-                  >
-                    {asset.replace('_', ' ')}
-                  </button>
-                ))}
+              <div className="px-3 py-2 rounded-xl text-xs font-bold border bg-amber-500/20 border-amber-500 text-amber-300 inline-flex items-center gap-2">
+                USDT (TRC20)
               </div>
             </div>
 
