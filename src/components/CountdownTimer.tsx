@@ -22,17 +22,25 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
   useEffect(() => {
     const calculateTimeLeft = () => {
       const now = new Date();
-      const endOfMonth = new Date(
-        now.getFullYear(),
-        now.getMonth() + 1,
-        0,
-        23,
-        59,
-        59,
-        999
-      );
+      // İlk dönem: 30 Eylül 2026 23:59:59 (yerel)
+      // Sonrası: her ayın son günü
+      const firstSeasonEnd = new Date(2026, 8, 30, 23, 59, 59, 999); // month 8 = Eylül
+      let target: Date;
+      if (now.getTime() <= firstSeasonEnd.getTime()) {
+        target = firstSeasonEnd;
+      } else {
+        target = new Date(
+          now.getFullYear(),
+          now.getMonth() + 1,
+          0,
+          23,
+          59,
+          59,
+          999
+        );
+      }
 
-      const diff = endOfMonth.getTime() - now.getTime();
+      const diff = target.getTime() - now.getTime();
 
       if (diff <= 0) {
         return { days: 0, hours: 0, minutes: 0, seconds: 0 };
