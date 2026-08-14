@@ -34,7 +34,7 @@ export interface IpTracker {
 
 export type PaymentMethod = 'credit_card' | 'crypto_manual';
 export type TransactionStatus = 'pending' | 'approved' | 'rejected';
-export type CryptoAsset = 'USDT_TRC20' | 'BTC' | 'ETH';
+export type CryptoAsset = 'USDT_TRC20';
 
 export interface Transaction {
   id: string;
@@ -63,6 +63,7 @@ export interface SuperVotePackage {
   id: string;
   name: string;
   votes: number;
+  bonusVotes?: number;
   price: number;
   popular?: boolean;
   bonus?: string;
