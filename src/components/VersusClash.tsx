@@ -4,6 +4,7 @@ import { TranslationDictionary } from '../i18n/translations';
 import { motion, AnimatePresence } from 'motion/react';
 import { Heart, Zap, RefreshCw, Instagram, Sparkles, AlertCircle, ShieldAlert, CheckCircle2, Trophy, Gift, DollarSign, Award } from 'lucide-react';
 import { RewardSettings, formatPrizeUsd, DEFAULT_REWARD_SETTINGS } from '../lib/api';
+import { Language } from '../types';
 
 interface VersusClashProps {
   t: TranslationDictionary;
@@ -13,6 +14,7 @@ interface VersusClashProps {
   onVote: (contestantId: string, isSuperVote: boolean) => Promise<void>;
   onOpenStore: () => void;
   rewardSettings?: RewardSettings;
+  lang?: Language;
 }
 
 export const VersusClash: React.FC<VersusClashProps> = ({
@@ -23,7 +25,14 @@ export const VersusClash: React.FC<VersusClashProps> = ({
   onVote,
   onOpenStore,
   rewardSettings = DEFAULT_REWARD_SETTINGS,
+  lang = 'tr',
 }) => {
+  const announcementText =
+    rewardSettings.site_announcement?.[lang] ||
+    rewardSettings.site_announcement?.en ||
+    rewardSettings.site_announcement?.tr ||
+    '';
+
   const approvedList = contestants.filter((c) => c.status === 'approved');
 
   const [leftIndex, setLeftIndex] = useState(0);
@@ -402,6 +411,32 @@ export const VersusClash: React.FC<VersusClashProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Duyuru panosu — admin düzenler, dile göre */}
+      {announcementText ? (
+        <div className="mt-4 w-full rounded-2xl border border-pink-500/30 bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-amber-500/10 p-4 sm:p-5 shadow-lg">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-pink-500/20 border border-pink-500/40 flex items-center justify-center shrink-0">
+              <Sparkles className="w-4 h-4 text-pink-400" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-widest text-pink-400 mb-1">
+                {lang === 'tr' ? 'Duyuru' : 'Announcement'}
+              </p>
+              <p className="text-sm sm:text-base text-white/95 font-semibold leading-relaxed">
+                {announcementText}
+              </p>
+              {rewardSettings.credit_card_sales_enabled !== true && (
+                <p className="mt-2 text-[11px] text-amber-300/90 font-bold">
+                  {lang === 'tr'
+                    ? 'Kredi kartı (iyzico) Eylül’de açılacak. Super Vote için şimdilik kripto veya günlük ücretsiz oylar!'
+                    : 'Credit card (iyzico) opens in September. For now use crypto Super Votes or free daily votes!'}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* Recent Activities Status Strip */}
       <div className="mt-8 bg-white/5 rounded-2xl border border-white/10 p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
